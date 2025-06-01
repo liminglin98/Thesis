@@ -1,4 +1,5 @@
 \documentclass{beamer}
+\usepackage[normalem]{ulem}
 \usetheme{Madrid}
 
 \title{NGDP Targeting under Fiscal Leadership: A Framework for China's Monetary-Fiscal Interaction}
@@ -26,8 +27,75 @@
   \end{itemize}
 \end{frame}
 
-% Slide 2: Research Questions
-\begin{frame}{Potential Research Questions 1}
+\begin{frame}
+\frametitle{NGDP Targeting: Key Literature Insights}
+
+\textbf{1. Critiques of Traditional Rules}
+
+\begin{itemize}
+  \item \textbf{Orphanides (2001-2003)}:
+  \begin{itemize}
+    \item Real-time data on output gap and $r^*$ is noisy.
+    \item Taylor rule performance deteriorates with mismeasurement.
+  \end{itemize}
+
+  \item \textbf{McCallum (2000)}:
+  \begin{itemize}
+    \item Interest-rate rules rely on latent natural rate assumptions.
+    \item In unstable environments, quantity-based rules are more robust.
+    \item Calls for return to monetarist anchors like base growth or NGDP paths.
+  \end{itemize}
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{2. NGDP Targeting: Theoretical and Empirical Support}
+
+\begin{itemize}
+  \item \textbf{Garín, Lester \& Sims (2016):}
+  \begin{itemize}
+    \item In NK model with sticky wages/prices, NGDP targeting $\approx$ output gap targeting in welfare.
+    \item Requires no unobservable gap estimates.
+  \end{itemize}
+
+  \item \textbf{Beckworth \& Hendrickson (2019):}
+  \begin{itemize}
+    \item NGDP targeting linked to lower inflation volatility historically.
+  \end{itemize}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{Policy Rules: Formulas and Comparison}
+
+\textbf{1. McCallum Rule (Quantity-based)}:
+\[
+\Delta b_t = \Delta x^* + \gamma (\Delta x^* - \Delta x_{t-1})
+\]
+
+Targets growth of monetary base to stabilize NGDP growth.
+
+\textbf{2. Taylor Rule (Interest-rate-based)}:
+\[
+i_t = r^* + \pi_t + \phi_\pi (\pi_t - \pi^*) + \phi_y (y_t - y^*)
+\]
+
+Responds to inflation and output gaps—both difficult to estimate in real time.
+
+\textbf{3. NGDP Targeting}:
+\[
+ln(1+r_t)=\phi_\pi(1+\pi_t)+\phi_y ln (\frac{Y_t}{Y_{t-1}}) \text{(Garín, Lester \& Sims(2016))}
+\]
+
+\[
+r_t=\rho r_{t-1}+(1-\rho)\Omega\Delta x_t +e_t^r \text{(Beckworth \& Hendrickson (2019))}
+\]
+
+
+
+\end{frame}
+
+\begin{frame}{\sout{Potential Research Questions 1}}
   \begin{itemize}
     \item Does an NGDP Targeting policy rule explain PBoC behavior better than traditional inflation-targeting rules?
     \item Past papers (Burdekin \& Siklos (2024), Girardin, Lunven \& Ma (2017)) have shown that PBoC's policy rule is anti-inflation and follows both Taylor and McCallum rules to some extent.
@@ -35,39 +103,134 @@
   \end{itemize}
 \end{frame}
 
-% Slide 3: Model Overview
 \begin{frame}{Potential Research Questions 2}
-  \begin{itemize}
-    \item Can NGDP targeting outperform inflation targeting and coordinate stabilization efforts between the PBoC and MoF in a setting where one or both face institutional or economic constraints?
-    \item Beckworth \& Hendrickson (2020) incoporated NGDP targeting into a New Keynesian model found that it creates lower volatility in inflation than Taylor-type rules.
-
-    \item \textbf{Contribution}: RANK model with ZLB constraint using Chinese data
+  
     \begin{itemize}
-      \item Monetary rule: Taylor vs. NGDP targeting
-      \item Fiscal rule: Exogenous (Simple AR(1)) vs. \textcolor{red}{Output gap -reactive (like Taylor rule) vs. NGDP targeting}
+      \item Can NGDP targeting outperform inflation targeting and coordinate stabilization efforts between the PBoC and MoF in a setting where one or both face institutional or economic constraints?
+      \item Beckworth \& Hendrickson (2019) incoporated NGDP targeting into a New Keynesian model found that it creates lower volatility in inflation than Taylor-type rules.
+      \item \textbf{Contribution}: RANK model with ZLB constraint using Chinese data
+      \begin{itemize}
+        \item Monetary rule: Taylor vs. NGDP targeting
+        \item Fiscal rule: Exogenous (Simple AR(1)) vs. \textcolor{red}{Output gap -reactive (like Taylor rule) vs. NGDP targeting}
+      \end{itemize}
     \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Model Setup}
+  \begin{itemize}
+    \item Monetary rule: Taylor vs. \textcolor{red}{NGDP targeting}
+      \begin{itemize}
+        \item Level Targeting: $r_t=\phi_x(x_t-x^*)$
+        \item Growth Targeting: $r_t=\phi_x(\Delta x_t-\Delta x^*)$
+        \item Can also add other components like AR(1)
+      \end{itemize}
+    \item Fiscal rule: Exogenous (Simple AR(1)) + Steady Level Spending vs. \textcolor{red}{Output gap -reactive (like Taylor rule) vs. NGDP targeting}
+      \begin{itemize}
+        \item Output gap reactive: $g_t=\gamma_y(y_t-y^f)$
+        \item NGDP Level Targeting: $g_t=\gamma_x(x_t-x^*)$
+        \item NGDP Growth Targeting: $g_t=\gamma_x(\Delta x_t-\Delta x^*)$
+      \end{itemize}
   \end{itemize}
 \end{frame}
 
-
-% Slide 5: Contribution and Next Steps
-\begin{frame}{Strategic Interactions between PBoC and MoF ?}
-  \begin{itemize}
-    \item \textbf{Stage 2:} Add policy interaction between PBoC and MoF (Stackelberg/Nash)
-    \begin{itemize}
-      \item Monetary and fiscal authorities modeled with separate rules:
-      \begin{itemize}
-        \item PBoC: interest rate responds to inflation/output gap/NGDP
-        \item MoF: government spending responds to debt/output gap/NGDP
-      \end{itemize}
-      \item Strategic setups:
-      \begin{itemize}
-        \item \textbf{Stackelberg:} MoF leads, PBoC follows
-        \item \textbf{Nash:} Simultaneous policy moves
-      \end{itemize}
-      \item NGDP targeting tested as \textbf{coordination anchor}
-    \end{itemize}
-  \end{itemize}
+\begin{frame}{Monetary-Fiscal Interaction in China}
+\begin{itemize}
+    \item In China, fiscal and monetary authorities (MoF and PBoC) interact strategically.
+    \item Recent events (e.g., 1.1 trillion RMB profit remittance) highlight blurred institutional boundaries.
+    \item Objective: model these interactions using game theory to understand outcomes under NGDP targeting.
+\end{itemize}
 \end{frame}
+
+\begin{frame}{Leeper (1991): Active vs. Passive Policy}
+\begin{itemize}
+    \item Defines monetary and fiscal regimes as \textbf{active} or \textbf{passive}.
+    \item \textbf{Active monetary policy:} strong response to inflation
+    \item \textbf{Passive fiscal policy:} adjusts to ensure intertemporal budget constraint holds
+    \item Uniqueness of equilibrium depends on the mix:
+    \begin{itemize}
+        \item (Monetary active, fiscal passive) $\Rightarrow$stable prices
+        \item (Both active/passive) $\Rightarrow$ possible indeterminacy
+    \end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Dixit and Lambertini (2003)}
+\begin{itemize}
+    \item Monetary and fiscal authorities minimize separate loss functions:
+\end{itemize}
+\[
+    L_{\text{CB}} = \frac{1}{2}(\pi - \pi^*)^2 + \frac{\lambda}{2}y^2
+\]
+\[
+    L_{\text{F}} = \frac{1}{2}(\pi - \pi^*)^2 + \frac{\beta}{2}y^2 + \frac{\gamma}{2}g^2
+\]
+\begin{itemize}
+    \item Economy described by:
+\end{itemize}
+\[
+    y = a g - b r
+\]
+\[
+    \pi = \kappa y
+\]
+\begin{itemize}
+    \item Equilibrium depends on timing:
+    \begin{itemize}
+        \item Nash: each authority ignores externalities $\Rightarrow$ inflation bias
+    \end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{My Setup: Stackelberg Game (MoF Leads)}
+\begin{itemize}
+    \item Fiscal authority maximizes:
+    \[ U_{\text{MoF}} = y - \frac{\gamma}{2}g^2 - \frac{\theta}{2}\pi^2 \]
+    \item PBoC minimizes:
+    \[ L_{\text{PBoC}} = \frac{1}{2}\pi^2 + \frac{\lambda}{2}y^2 \]
+    \item Subject to:
+    \[ y = a g - b r, \quad \pi = \kappa y \]
+\end{itemize}
+\begin{itemize}
+    \item Solve by backward induction:
+    \begin{enumerate}
+        \item PBoC best response $\Rightarrow$ $r(g)$
+        \item MoF chooses $g$ anticipating $r(g)$
+    \end{enumerate}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Equilibrium Intuition}
+\begin{itemize}
+    \item Under \textbf{fiscal leadership}, monetary policy accommodates spending $\Rightarrow$ inflation bias
+    \item Chinese context: MoF may effectively lead due to treasury control, land finance, local incentives
+\end{itemize}
+\end{frame}
+
+\begin{frame}{NGDP Targeting Variant (Placeholder)}
+\begin{itemize}
+    \item Under NGDP targeting, both authorities aim to stabilize nominal income:
+\end{itemize}
+\begin{align*}
+    L_{\text{PBoC}} &= \phi_{\text{pboc}} (y - y^*)^2 \\
+    U_{\text{MoF}} &= \phi_{\text{mof}} (y - y^*)^2
+\end{align*}
+\begin{itemize}
+    \item Extensions can consider how fiscal leadership affects NGDP-targeting credibility
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Possible Extensions}
+\begin{itemize}
+    \item Add local governments as strategic agents:
+    \begin{itemize}
+        \item Nodes in a network
+        \item Invest in real estate vs. productive sectors
+    \end{itemize}
+    \item Explain why stimulus flows disproportionately into real estate
+    \item Link game outcome to fiscal rule in RANK model with NGDP targeting
+\end{itemize}
+\end{frame}
+
 
 \end{document}
