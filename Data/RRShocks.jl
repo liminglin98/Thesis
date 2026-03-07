@@ -7,6 +7,7 @@ using StatsModels
 using Plots
 using Dates
 using ShiftedArrays, CovarianceMatrices
+using Printf
 ##
 cd(@__DIR__)
 pwd()
@@ -15,7 +16,7 @@ pwd()
 df = CSV.read("df_final.csv", DataFrame);
 ##
 # Create new variables for positive and negative GDP gaps
-df.not_meet_target = df.gdp_gap .< 1;
+df.not_meet_target = df.gdp_gap .< -1;
 df.gap_pos = df.gdp_gap .* (1 .- df.not_meet_target);
 df.gap_neg = df.gdp_gap .* df.not_meet_target;
 ##
@@ -48,6 +49,16 @@ model1 = lm(@formula( cmpi ~ cmpi_l1 + cpi_gap_l1 + gap_pos_l1 + gap_neg_l1 + fx
 # Generate predictions from the model
 df.pred_cmpi = predict(model1)
 df.residuals = residuals(model1)
+
+# Plot residuals from model1
+plot(df.quarter, df.residuals,
+    label="Model1 residuals",
+    legend=:topleft,
+    xlabel="Quarter",
+    ylabel="Residual",
+    title="Model1 Residuals Over Time")
+hline!([0.0], linestyle=:dash, color=:black, alpha=0.6, label="Zero line")
+## 
 # Plot actual vs predicted values
 plot(df.quarter, df.cmpi, label="CMPI", legend=:topleft)
 plot!(df.quarter, df.pred_cmpi, label="Predicted CMPI", linestyle=:dash)
@@ -68,25 +79,22 @@ ylabel!("CMPI")
 title!("Actual vs Predicted CMPI (no lags)")
 ##
 # IV-SVAR
-# ...existing code...
 using LinearAlgebra
-
 # =========================
-# IV-SVAR (Proxy SVAR)
-# Order: [cmpi, cpi, realgdpgrowth, CNYUSDSpot]
-# Instrument: residuals (from model1)
+# SVAR with Recursive Identification
+# Order: [residuals, realgdpgrowth, cpi, cmpi, FR007, CNYUSDSpot]
+# residuals = monetary policy shock (from model1)
 # =========================
 
 # 1) Build estimation sample
-vars = [:cmpi, :cpi, :realgdpgrowth, :CNYUSDSpot, :residuals]
-df_iv = dropmissing(df, vars)
+vars = [:residuals, :realgdpgrowth, :cpi, :cmpi, :FR007, :CNYUSDSpot]
+df_svar = dropmissing(df, vars)
 
-Y = Matrix(df_iv[:, [:cmpi, :cpi, :realgdpgrowth, :CNYUSDSpot]])  # T x n
-z = Vector(df_iv.residuals)                                       # T
+Y = Matrix(df_svar[:, [:residuals, :realgdpgrowth, :cpi, :cmpi, :FR007, :CNYUSDSpot]])  # T x n
+T, n = size(Y)
 
 # 2) Reduced-form VAR(p) by OLS
-p = 4
-T, n = size(Y)
+p = 2  # 2 lags
 Teff = T - p
 
 Ydep = Y[p+1:end, :]  # Teff x n
@@ -99,32 +107,22 @@ end
 B = X \ Ydep                 # coefficients
 U = Ydep - X * B             # reduced-form residuals, Teff x n
 
-# align instrument to VAR residual sample
-zv = z[p+1:end]
+println("\n" * "="^60)
+println("SVAR Estimation Results")
+println("="^60)
+println("Sample size: ", Teff)
+println("Variables: [residuals, realgdpgrowth, cpi, cmpi, FR007, CNYUSDSpot]")
 
-# keep rows with valid instrument
-keep = .!ismissing.(zv) .& .!isnan.(zv)
-U = U[keep, :]
-zv = Float64.(zv[keep])
+# 3) Structural identification via Cholesky decomposition (recursive ordering)
+Sigma = (U' * U) / Teff      # variance-covariance matrix
+P = cholesky(Sigma).L        # Cholesky decomposition: Sigma = P * P'
 
-# 3) Proxy identification (single instrument for shock in first variable: cmpi)
-u1 = U[:, 1]
-u2 = U[:, 2:end]
+# Impact matrix: each column is the impact of one structural shock
+# First column = impact of monetary policy shock (residuals shock)
+println("\nImpact matrix P (columns = structural shocks):")
+display(P)
 
-cov_zu1 = mean((zv .- mean(zv)) .* (u1 .- mean(u1)))
-cov_zu2 = vec(mean((zv .- mean(zv)) .* (u2 .- mean(u2)), dims=1))
-
-# impact vector normalized with b1 = 1
-b = vcat(1.0, cov_zu2 ./ cov_zu1)
-
-# optional sign normalization: positive policy shock raises cmpi on impact
-if b[1] < 0
-    b .*= -1
-end
-
-println("Impact vector b (unit policy shock): ", b)
-
-# 4) IRFs
+# 4) IRFs for monetary policy shock (first structural shock)
 # Extract A1..Ap from OLS coefficients
 A = Vector{Matrix{Float64}}(undef, p)
 for L in 1:p
@@ -144,16 +142,96 @@ for h in 1:H
     C[h + 1] = Ch
 end
 
+# IRF to monetary policy shock (first column of P)
+b = P[:, 1]
+cmpi_idx = 4
+if abs(b[cmpi_idx]) > 1e-10
+    # Scale shock so CMPI rises by exactly +1 on impact (t=0)
+    b = b ./ b[cmpi_idx]
+else
+    @warn "CMPI impact is near zero; cannot normalize shock to +1 CMPI at t=0"
+end
 irf = zeros(H+1, n)
 for h in 0:H
     irf[h+1, :] = C[h+1] * b
 end
 
-# 5) Plot IRFs
-labels = ["cmpi", "cpi", "realgdpgrowth", "CNYUSDSpot"]
-p1 = plot(0:H, irf[:,1], title="IRF of cmpi", label="", xlabel="Horizon", ylabel="Response")
-p2 = plot(0:H, irf[:,2], title="IRF of cpi", label="", xlabel="Horizon", ylabel="Response")
-p3 = plot(0:H, irf[:,3], title="IRF of realgdpgrowth", label="", xlabel="Horizon", ylabel="Response")
-p4 = plot(0:H, irf[:,4], title="IRF of CNYUSDSpot", label="", xlabel="Horizon", ylabel="Response")
-plot(p1, p2, p3, p4, layout=(2,2), size=(900,600))
-# ...existing code...
+# 5) Bootstrap confidence bands (68%)
+n_boot = 1000
+irf_boot = zeros(n_boot, H+1, n)
+valid_boot = 0
+
+for boot_iter in 1:n_boot
+    # Resample with replacement
+    boot_idx = rand(1:Teff, Teff)
+    U_boot = U[boot_idx, :]
+    
+    # Re-estimate variance-covariance matrix and Cholesky
+    Sigma_boot = (U_boot' * U_boot) / Teff
+    P_boot = cholesky(Sigma_boot).L
+    b_boot = P_boot[:, 1]
+    if abs(b_boot[cmpi_idx]) > 1e-10
+        b_boot = b_boot ./ b_boot[cmpi_idx]
+    else
+        continue
+    end
+    valid_boot += 1
+    
+    # Compute IRFs for this bootstrap sample
+    for h in 0:H
+        irf_boot[valid_boot, h+1, :] = C[h+1] * b_boot
+    end
+end
+
+if valid_boot == 0
+    error("No valid bootstrap draws after CMPI normalization")
+end
+
+irf_boot = irf_boot[1:valid_boot, :, :]
+
+# Compute 68% confidence bands (16th and 84th percentiles)
+irf_lower = zeros(H+1, n)
+irf_upper = zeros(H+1, n)
+
+for h in 0:H
+    for j in 1:n
+        irf_lower[h+1, j] = quantile(irf_boot[:, h+1, j], 0.16)
+        irf_upper[h+1, j] = quantile(irf_boot[:, h+1, j], 0.84)
+    end
+end
+
+println("\n" * "="^60)
+println("SVAR IRF Results (2 lags, with 68% CI)")
+println("="^60)
+println("Response to monetary policy shock normalized to +1 CMPI at t=0")
+
+# 6) Plot IRFs with 68% confidence bands
+labels = ["Residuals", "Real GDP Growth", "CPI", "CMPI", "FR007", "CNY/USD Spot"]
+p_plots_svar = []
+
+for j in 1:n
+    p = plot(0:H, irf[:,j], 
+             title="IRF of $(labels[j])", 
+             label="Point Estimate", 
+             xlabel="Quarters", 
+             ylabel="Response",
+             legend=:topright,
+             marker=:circle,
+             markersize=3,
+             linewidth=2,
+             color=:green)
+    plot!(p, 0:H, irf_lower[:, j],
+          fillrange=irf_upper[:, j],
+          fillalpha=0.2,
+          fillcolor=:green,
+          linealpha=0,
+          label="68% CI")
+    hline!([0], color=:gray, linestyle=:dash, alpha=0.5, label="")
+    push!(p_plots_svar, p)
+end
+
+plot_svar = plot(p_plots_svar..., layout=(2,3), size=(1000,600))
+display(plot_svar)
+savefig(plot_svar, "irf_svar.png")
+##
+# BSVAR
