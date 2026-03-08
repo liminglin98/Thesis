@@ -8,6 +8,38 @@ using Plots
 using Dates
 using ShiftedArrays, CovarianceMatrices
 using Printf
+using Random, Distributions
+using LinearAlgebra
+##
+# Robust Cholesky for covariance-like matrices: symmetrize and add tiny jitter if needed.
+function safe_cholesky(A::AbstractMatrix{<:Real}; jitter0::Float64 = 1e-10, max_tries::Int = 8)
+    A_sym = 0.5 .* (Matrix(A) + Matrix(A)')
+    nA = size(A_sym, 1)
+    for t in 0:max_tries
+        jitter = jitter0 * (10.0^t)
+        A_try = A_sym + jitter * I(nA)
+        F = cholesky(Symmetric(A_try); check=false)
+        if issuccess(F)
+            return F
+        end
+    end
+    error("safe_cholesky failed even after jitter escalation")
+end
+
+# Return an SPD matrix close to A by symmetrization + minimal diagonal jitter.
+function make_spd(A::AbstractMatrix{<:Real}; jitter0::Float64 = 1e-10, max_tries::Int = 8)
+    A_sym = 0.5 .* (Matrix(A) + Matrix(A)')
+    nA = size(A_sym, 1)
+    for t in 0:max_tries
+        jitter = jitter0 * (10.0^t)
+        A_try = A_sym + jitter * I(nA)
+        F = cholesky(Symmetric(A_try); check=false)
+        if issuccess(F)
+            return Matrix(Symmetric(A_try))
+        end
+    end
+    error("make_spd failed even after jitter escalation")
+end
 ##
 cd(@__DIR__)
 pwd()
@@ -64,22 +96,64 @@ plot(df.quarter, df.cmpi, label="CMPI", legend=:topleft)
 plot!(df.quarter, df.pred_cmpi, label="Predicted CMPI", linestyle=:dash)
 xlabel!("Quarter")
 ylabel!("CMPI")
-title!("Actual vs Predicted CMPI (MANR2026)")
-
-##
-# Use no lags
-df2 = dropmissing(df, [:cmpi, :cmpi_l1,  :cpi_gap, :gap_pos, :gap_neg, :fx_gap])
+title!("Actual vs Predicted CMPI")
+savefig("CMPI Comparison (MANR2026).png")
+## No Lag
+df2 = dropmissing(df, [:quarter, :cmpi, :cmpi_l1, :cpi_gap, :gap_pos, :gap_neg, :fx_gap])
 model2 = lm(@formula( cmpi ~ cmpi_l1 +cpi_gap + gap_pos + gap_neg + fx_gap), df2)
 df2.pred_cmpi2 = predict(model2)
 df2.residuals2 = residuals(model2)
+plot(df2.quarter, df2.residuals2,
+    label="Model2 residuals",
+    legend=:topleft,
+    xlabel="Quarter",
+    ylabel="Residual",
+    title=" Residuals (With no lags) Over Time")
+hline!([0.0], linestyle=:dash, color=:black, alpha=0.6, label="Zero line")
+# Plot actual vs predicted values for model2
 plot(df2.quarter, df2.cmpi, label="CMPI", legend=:topleft)
-plot!(df2.quarter, df2.pred_cmpi2, label="Predicted CMPI (no lags)", linestyle=:dash)
+plot!(df2.quarter, df2.pred_cmpi2, label="Predicted CMPI", linestyle=:dash)
 xlabel!("Quarter")
 ylabel!("CMPI")
-title!("Actual vs Predicted CMPI (no lags)")
+title!("Actual vs Predicted CMPI (No Lags)")     
+savefig("CMPI Comparison (No Lags).png")
 ##
 # IV-SVAR
 using LinearAlgebra
+
+# Fallback for running this file from the middle in REPL/section mode.
+if !isdefined(@__MODULE__, :safe_cholesky)
+    function safe_cholesky(A::AbstractMatrix{<:Real}; jitter0::Float64 = 1e-10, max_tries::Int = 8)
+        A_sym = 0.5 .* (Matrix(A) + Matrix(A)')
+        nA = size(A_sym, 1)
+        for t in 0:max_tries
+            jitter = jitter0 * (10.0^t)
+            A_try = A_sym + jitter * I(nA)
+            F = cholesky(Symmetric(A_try); check=false)
+            if issuccess(F)
+                return F
+            end
+        end
+        error("safe_cholesky failed even after jitter escalation")
+    end
+end
+
+if !isdefined(@__MODULE__, :make_spd)
+    function make_spd(A::AbstractMatrix{<:Real}; jitter0::Float64 = 1e-10, max_tries::Int = 8)
+        A_sym = 0.5 .* (Matrix(A) + Matrix(A)')
+        nA = size(A_sym, 1)
+        for t in 0:max_tries
+            jitter = jitter0 * (10.0^t)
+            A_try = A_sym + jitter * I(nA)
+            F = cholesky(Symmetric(A_try); check=false)
+            if issuccess(F)
+                return Matrix(Symmetric(A_try))
+            end
+        end
+        error("make_spd failed even after jitter escalation")
+    end
+end
+
 # =========================
 # SVAR with Recursive Identification
 # Order: [residuals, realgdpgrowth, cpi, cmpi, FR007, CNYUSDSpot]
@@ -115,7 +189,7 @@ println("Variables: [residuals, realgdpgrowth, cpi, cmpi, FR007, CNYUSDSpot]")
 
 # 3) Structural identification via Cholesky decomposition (recursive ordering)
 Sigma = (U' * U) / Teff      # variance-covariance matrix
-P = cholesky(Sigma).L        # Cholesky decomposition: Sigma = P * P'
+P = safe_cholesky(Sigma).L   # Cholesky decomposition: Sigma = P * P'
 
 # Impact matrix: each column is the impact of one structural shock
 # First column = impact of monetary policy shock (residuals shock)
@@ -168,7 +242,7 @@ for boot_iter in 1:n_boot
     
     # Re-estimate variance-covariance matrix and Cholesky
     Sigma_boot = (U_boot' * U_boot) / Teff
-    P_boot = cholesky(Sigma_boot).L
+    P_boot = safe_cholesky(Sigma_boot).L
     b_boot = P_boot[:, 1]
     if abs(b_boot[cmpi_idx]) > 1e-10
         b_boot = b_boot ./ b_boot[cmpi_idx]
@@ -233,5 +307,3 @@ end
 plot_svar = plot(p_plots_svar..., layout=(2,3), size=(1000,600))
 display(plot_svar)
 savefig(plot_svar, "irf_svar.png")
-##
-# BSVAR
