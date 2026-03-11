@@ -121,7 +121,6 @@ savefig("CMPI Comparison (No Lags).png")
 # IV-SVAR
 using LinearAlgebra
 
-# Fallback for running this file from the middle in REPL/section mode.
 if !isdefined(@__MODULE__, :safe_cholesky)
     function safe_cholesky(A::AbstractMatrix{<:Real}; jitter0::Float64 = 1e-10, max_tries::Int = 8)
         A_sym = 0.5 .* (Matrix(A) + Matrix(A)')
