@@ -15,7 +15,7 @@ cd(@__DIR__)
 pwd()
 ##
 # Load the data
-df = CSV.read("romer_monthly_data.csv", DataFrame);
+df = CSV.read("romer_china_data.csv", DataFrame);
 ##
 # Calculate monthly GDP growth and CPI gap
 df.gdp_gap = df.realgdp_monthly_yoy - df.target_gdp
@@ -33,53 +33,96 @@ df.dCNYUSDCPR = df.CNYUSDCPR .- lag(df.CNYUSDCPR, 1)
 df.fx_gap = df.dCNYUSDCPR .* df.after2006 .* (df.CNYUSDSpot .- df.CNYUSDCPR)
 ##
 # Create lagged variables for the regression
-df.omo7d_l1   = lag(df.omo7d, 1);
+df.FR007_l1   = lag(df.FR007, 1);
 df.cpi_gap_l1 = lag(df.cpi_gap, 1);
 df.gap_pos_l1 = lag(df.gap_pos, 1);
 df.gap_neg_l1 = lag(df.gap_neg, 1);
 df.fx_gap_l1 = lag(df.fx_gap, 1);
 ## 
 # Run the regression strictly followig MANR2026
-model1 = lm(@formula( omo7d ~ omo7d_l1 + cpi_gap_l1 + gap_pos_l1 + gap_neg_l1 + fx_gap_l1), df)
-# Generate predictions from the model
-df.pred_omo7d = predict(model1)
-df.residuals = residuals(model1)
+cols = [:FR007, :FR007_l1, :cpi_gap_l1, :gap_pos_l1, :gap_neg_l1, :fx_gap_l1]
+complete = completecases(df[:, cols])
 
+model1 = lm(@formula(FR007 ~ FR007_l1 + cpi_gap_l1 + gap_pos_l1 + gap_neg_l1 + fx_gap_l1), df[complete, :])
+
+df.pred_FR007 = Vector{Union{Missing, Float64}}(missing, nrow(df))
+df.residuals  = Vector{Union{Missing, Float64}}(missing, nrow(df))
+df.pred_FR007[complete] = predict(model1)
+df.residuals[complete]  = residuals(model1)
+##
 # Plot residuals from model1
 plot(df.date, df.residuals,
     label="Model1 residuals",
     legend=:topleft,
     xlabel="Date",
     ylabel="Residual",
-    title="Model1 Residuals Over Time")
+    title="FR007 Residuals Over Time")
 hline!([0.0], linestyle=:dash, color=:black, alpha=0.6, label="Zero line")
 ## 
 # Plot actual vs predicted values
-plot(df.date, df.cmpi, label="CMPI", legend=:topleft)
-plot!(df.date, df.pred_cmpi, label="Predicted CMPI", linestyle=:dash)
+plot(df.date, df.FR007, label="Actual FR007", legend=:topleft)
+plot!(df.date, df.pred_FR007, label="Predicted FR007", linestyle=:dash)
 xlabel!("Date")
-ylabel!("CMPI")
-title!("Actual vs Predicted CMPI")
-savefig("CMPI Comparison (MANR2026).png")
-## No Lag
-df2 = dropmissing(df, [:date, :cmpi, :cmpi_l1, :cpi_gap, :gap_pos, :gap_neg, :fx_gap])
-model2 = lm(@formula( cmpi ~ cmpi_l1 +cpi_gap + gap_pos + gap_neg + fx_gap), df2)
-df2.pred_cmpi2 = predict(model2)
-df2.residuals2 = residuals(model2)
-plot(df2.date, df2.residuals2,
-    label="Model2 residuals",
-    legend=:topleft,
-    xlabel="Date",
-    ylabel="Residual",
-    title=" Residuals (With no lags) Over Time")
-hline!([0.0], linestyle=:dash, color=:black, alpha=0.6, label="Zero line")
-# Plot actual vs predicted values for model2
-plot(df2.date, df2.cmpi, label="CMPI", legend=:topleft)
-plot!(df2.date, df2.pred_cmpi2, label="Predicted CMPI", linestyle=:dash)
-xlabel!("Date")
-ylabel!("CMPI")
-title!("Actual vs Predicted CMPI (No Lags)")     
-savefig("CMPI Comparison (No Lags).png")
+ylabel!("FR007")
+title!("Actual vs Predicted FR007")
+##
+# Run the exact same regression excluding 2020
+df_ex2020 = df[year.(df.date) .!= 2020, :]
+cols_ex = [:FR007, :FR007_l1, :cpi_gap_l1, :gap_pos_l1, :gap_neg_l1, :fx_gap_l1]
+complete_ex = completecases(df_ex2020[:, cols_ex])
+
+model_ex2020 = lm(@formula(FR007 ~ FR007_l1 + cpi_gap_l1 + gap_pos_l1 + gap_neg_l1 + fx_gap_l1), df_ex2020[complete_ex, :])
+
+df_ex2020 = df_ex2020[complete_ex, :]
+df_ex2020.pred_FR007_ex = predict(model_ex2020)
+df_ex2020.residuals_ex  = residuals(model_ex2020)
+
+println("\n=== Model (full sample) ===")
+println(model1)
+println("\n=== Model (excluding 2020) ===")
+println(model_ex2020)
+##
+# Plot residuals: full sample vs excluding 2020
+p_res = plot(df.date, df.residuals,
+    label="Full sample", legend=:topleft,
+    xlabel="Date", ylabel="Residual",
+    title="FR007 Residuals: Full vs Excl. 2020",
+    color=:blue, alpha=0.7)
+plot!(p_res, df_ex2020.date, df_ex2020.residuals_ex,
+    label="Excl. 2020", color=:red, linestyle=:dash, alpha=0.7)
+hline!([0.0], linestyle=:dot, color=:black, alpha=0.5, label="")
+display(p_res)
+savefig(p_res, "FR007_residuals_comparison.png")
+##
+# Plot actual vs predicted: full sample vs excluding 2020
+p_fit = plot(df.date, df.FR007,
+    label="Actual FR007", legend=:topleft,
+    xlabel="Date", ylabel="FR007",
+    title="Actual vs Predicted FR007: Full vs Excl. 2020",
+    color=:black)
+plot!(p_fit, df.date, df.pred_FR007,
+    label="Predicted (full)", color=:blue, linestyle=:dash)
+plot!(p_fit, df_ex2020.date, df_ex2020.pred_FR007_ex,
+    label="Predicted (excl. 2020)", color=:red, linestyle=:dot)
+display(p_fit)
+savefig(p_fit, "FR007_fit_comparison.png")
+##
+# Plot coefficient comparison
+coef_full   = coef(model1)
+coef_ex     = coef(model_ex2020)
+coef_names  = coefnames(model1)
+n_coef      = length(coef_names)
+
+p_coef = plot(1:n_coef, coef_full,
+    seriestype=:bar, label="Full sample",
+    xticks=(1:n_coef, coef_names), xrotation=30,
+    ylabel="Coefficient", title="Coefficient Comparison: Full vs Excl. 2020",
+    alpha=0.6, color=:blue, legend=:topright)
+plot!(p_coef, (1:n_coef) .+ 0.3, coef_ex,
+    seriestype=:bar, label="Excl. 2020",
+    alpha=0.6, color=:red, bar_width=0.3)
+display(p_coef)
+savefig(p_coef, "FR007_coef_comparison.png")
 ##
 # IV-SVAR
 using LinearAlgebra
