@@ -146,8 +146,13 @@ using LinearAlgebra, Random, Distributions, Printf, Statistics
 # =========================
 # 1) Data preparation
 # =========================
+# Transform to YoY growth rates (matching MANR2026)
+# Skip variables already in growth rates or percentage points
 rename!(df, "trade balance" => :trade_balance, "current consumption" => :current_consumption)
-var_syms = [:realgdp_monthly_yoy, :cpi, :FR007, :CNYUSDSpot, :trade_balance, :current_consumption]
+df.CNYUSDSpot_yoy = (df.CNYUSDSpot ./ lag(df.CNYUSDSpot, 12) .- 1) .* 100
+df.current_consumption_yoy = (df.current_consumption ./ lag(df.current_consumption, 12) .- 1) .* 100
+
+var_syms = [:realgdp_monthly_yoy, :cpi, :FR007, :CNYUSDSpot_yoy, :current_consumption_yoy]
 all_syms = vcat(var_syms, [:residuals])
 
 df_bvar = dropmissing(df, all_syms)
@@ -164,7 +169,7 @@ H = 24  # IRF horizon (months)
 gdp_col    = findfirst(==(:realgdp_monthly_yoy), var_syms)
 policy_col = findfirst(==(:FR007), var_syms)
 
-var_labels = ["Real GDP Growth", "CPI", "FR007", "CNY/USD Spot", "Trade Balance", "Current Consumption"]
+var_labels = ["Real GDP Growth", "CPI", "FR007", "CNY/USD Spot", "Current Consumption"]
 
 println("Variables: ", var_syms)
 println("GDP column: ", gdp_col, " → ", var_syms[gdp_col])
@@ -313,7 +318,7 @@ function iv_identify(U::Matrix{Float64}, z::Vector{Float64},
         b_rel[j] = (u_hat' * U[:, j]) / denom
     end
     
-    b_rel[gdp_col] = 0.0
+    # b_rel[gdp_col] = 0.0
     
     if abs(b_rel[policy_col]) < 1e-10
         return nothing, F_stat, gamma_hat
@@ -565,3 +570,4 @@ println(@sprintf("Minnesota d:                 %.1f", d))
 println("Zero restriction:            GDP = 0 on impact")
 println("Normalization:               +1 pp FR007 on impact")
 println("Bands:                       Posterior credible sets (not CI)")
+##
