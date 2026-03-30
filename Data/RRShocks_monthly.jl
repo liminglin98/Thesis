@@ -152,7 +152,7 @@ rename!(df, "trade balance" => :trade_balance, "current consumption" => :current
 df.CNYUSDSpot_yoy = (df.CNYUSDSpot ./ lag(df.CNYUSDSpot, 12) .- 1) .* 100
 df.current_consumption_yoy = (df.current_consumption ./ lag(df.current_consumption, 12) .- 1) .* 100
 
-var_syms = [:realgdp_monthly_yoy, :cpi, :FR007, :CNYUSDSpot_yoy, :current_consumption_yoy]
+var_syms = [:realgdp_monthly_yoy, :cpi, :FR007, :CNYUSDSpot_yoy, :current_consumption_yoy, :IP_yoy]
 all_syms = vcat(var_syms, [:residuals])
 
 df_bvar = dropmissing(df, all_syms)
@@ -169,7 +169,7 @@ H = 24  # IRF horizon (months)
 gdp_col    = findfirst(==(:realgdp_monthly_yoy), var_syms)
 policy_col = findfirst(==(:FR007), var_syms)
 
-var_labels = ["Real GDP Growth", "CPI", "FR007", "CNY/USD Spot", "Current Consumption"]
+var_labels = ["Real GDP Growth", "CPI", "FR007", "CNY/USD Spot", "Current Consumption", "Industrial Production"]
 
 println("Variables: ", var_syms)
 println("GDP column: ", gdp_col, " → ", var_syms[gdp_col])
