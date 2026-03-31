@@ -80,10 +80,10 @@ df = dropmissing(df, [:cmpi_l1, :cmpi, :cpi_gap_l1, :gap_pos_l1, :gap_neg_l1, :f
 model1 = lm(@formula( cmpi ~ cmpi_l1 + cpi_gap_l1 + gap_pos_l1 + gap_neg_l1 + fx_gap_l1), df)
 # Generate predictions from the model
 df.pred_cmpi = predict(model1)
-df.residuals = residuals(model1)
+df.policy_residual = GLM.residuals(model1)
 
 # Plot residuals from model1
-plot(df.quarter, df.residuals,
+plot(df.quarter, df.policy_residual,
     label="Model1 residuals",
     legend=:topleft,
     xlabel="Quarter",
@@ -102,7 +102,7 @@ savefig("CMPI Comparison (MANR2026).png")
 df2 = dropmissing(df, [:quarter, :cmpi, :cmpi_l1, :cpi_gap, :gap_pos, :gap_neg, :fx_gap])
 model2 = lm(@formula( cmpi ~ cmpi_l1 +cpi_gap + gap_pos + gap_neg + fx_gap), df2)
 df2.pred_cmpi2 = predict(model2)
-df2.residuals2 = residuals(model2)
+df2.residuals2 = GLM.residuals(model2)
 plot(df2.quarter, df2.residuals2,
     label="Model2 residuals",
     legend=:topleft,
@@ -155,15 +155,15 @@ end
 
 # =========================
 # SVAR with Recursive Identification
-# Order: [residuals, realgdpgrowth, cpi, cmpi, FR007, CNYUSDSpot]
-# residuals = monetary policy shock (from model1)
+# Order: [policy_residual, realgdpgrowth, cpi, cmpi, FR007, CNYUSDSpot]
+# policy_residual = monetary policy shock (from model1)
 # =========================
 
 # 1) Build estimation sample
-vars = [:residuals, :realgdpgrowth, :cpi, :cmpi, :FR007, :CNYUSDSpot]
+vars = [:policy_residual, :realgdpgrowth, :cpi, :cmpi, :FR007, :CNYUSDSpot]
 df_svar = dropmissing(df, vars)
 
-Y = Matrix(df_svar[:, [:residuals, :realgdpgrowth, :cpi, :cmpi, :FR007, :CNYUSDSpot]])  # T x n
+Y = Matrix(df_svar[:, [:policy_residual, :realgdpgrowth, :cpi, :cmpi, :FR007, :CNYUSDSpot]])  # T x n
 T, n = size(Y)
 
 # 2) Reduced-form VAR(p) by OLS
@@ -184,14 +184,14 @@ println("\n" * "="^60)
 println("SVAR Estimation Results")
 println("="^60)
 println("Sample size: ", Teff)
-println("Variables: [residuals, realgdpgrowth, cpi, cmpi, FR007, CNYUSDSpot]")
+println("Variables: [policy_residual, realgdpgrowth, cpi, cmpi, FR007, CNYUSDSpot]")
 
 # 3) Structural identification via Cholesky decomposition (recursive ordering)
 Sigma = (U' * U) / Teff      # variance-covariance matrix
 P = safe_cholesky(Sigma).L   # Cholesky decomposition: Sigma = P * P'
 
 # Impact matrix: each column is the impact of one structural shock
-# First column = impact of monetary policy shock (residuals shock)
+# First column = impact of monetary policy shock (policy_residual shock)
 println("\nImpact matrix P (columns = structural shocks):")
 display(P)
 
@@ -279,7 +279,7 @@ println("="^60)
 println("Response to monetary policy shock normalized to +1 CMPI at t=0")
 
 # 6) Plot IRFs with 68% confidence bands
-labels = ["Residuals", "Real GDP Growth", "CPI", "CMPI", "FR007", "CNY/USD Spot"]
+labels = ["Policy Residual", "Real GDP Growth", "CPI", "CMPI", "FR007", "CNY/USD Spot"]
 p_plots_svar = []
 
 for j in 1:n

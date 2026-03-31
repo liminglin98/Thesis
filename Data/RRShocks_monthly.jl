@@ -46,13 +46,13 @@ complete = completecases(df[:, cols])
 model1 = lm(@formula(FR007 ~ FR007_l1 + cpi_gap_l1 + gap_pos_l1 + gap_neg_l1 + fx_gap_l1), df[complete, :])
 
 df.pred_FR007 = Vector{Union{Missing, Float64}}(missing, nrow(df))
-df.residuals  = Vector{Union{Missing, Float64}}(missing, nrow(df))
+df.policy_residual  = Vector{Union{Missing, Float64}}(missing, nrow(df))
 df.pred_FR007[complete] = predict(model1)
-df.residuals[complete]  = residuals(model1)
+df.policy_residual[complete]  = GLM.residuals(model1)
 
 ##
 # Plot residuals from model1
-plot(df.date, df.residuals,
+plot(df.date, df.policy_residual,
     label="Model1 residuals",
     legend=:topleft,
     xlabel="Date",
@@ -76,7 +76,7 @@ model_ex2020 = lm(@formula(FR007 ~ FR007_l1 + cpi_gap_l1 + gap_pos_l1 + gap_neg_
 
 df_ex2020 = df_ex2020[complete_ex, :]
 df_ex2020.pred_FR007_ex = predict(model_ex2020)
-df_ex2020.residuals_ex  = residuals(model_ex2020)
+df_ex2020.policy_residual_ex  = GLM.residuals(model_ex2020)
 
 println("\n=== Model (full sample) ===")
 println(model1)
@@ -84,12 +84,12 @@ println("\n=== Model (excluding 2020) ===")
 println(model_ex2020)
 ##
 # Plot residuals: full sample vs excluding 2020
-p_res = plot(df.date, df.residuals,
+p_res = plot(df.date, df.policy_residual,
     label="Full sample", legend=:topleft,
     xlabel="Date", ylabel="Residual",
     title="FR007 Residuals: Full vs Excl. 2020",
     color=:blue, alpha=0.7)
-plot!(p_res, df_ex2020.date, df_ex2020.residuals_ex,
+plot!(p_res, df_ex2020.date, df_ex2020.policy_residual_ex,
     label="Excl. 2020", color=:red, linestyle=:dash, alpha=0.7)
 hline!([0.0], linestyle=:dot, color=:black, alpha=0.5, label="")
 display(p_res)
@@ -152,14 +152,14 @@ using LinearAlgebra, Random, Distributions, Printf, Statistics
 df.CNYUSDSpot_yoy = (df.CNYUSDSpot ./ lag(df.CNYUSDSpot, 12) .- 1) .* 100
 
 var_syms = [:realgdp_monthly_yoy, :cpi, :FR007, :neer_yoy, :IP_yoy]
-all_syms = vcat(var_syms, [:residuals])
+all_syms = vcat(var_syms, [:policy_residual])
 
 df_bvar = dropmissing(df, all_syms)
 dates_bvar = df_bvar.date
 
 n = length(var_syms)
 Y_full = Matrix(df_bvar[:, var_syms])
-z_full = Vector(df_bvar[:, :residuals])
+z_full = Vector(df_bvar[:, :policy_residual])
 T_raw  = size(Y_full, 1)
 
 p = 6   # lags
