@@ -133,7 +133,7 @@ savefig(p_coef, "FR007_coef_comparison.png")
 #
 # Following MANR2026 / Giannone, Lenza & Primiceri (2015)
 #
-# VAR variables: [realgdp_monthly_yoy, cpi, FR007, CNYUSDSpot, trade_balance, current_consumption]
+# VAR variables: [realgdp_monthly_yoy, cpi, FR007, neer_yoy, IP_yoy]
 # Instrument:    RR residuals (external, NOT in the VAR)
 # Priors:        Minnesota (Normal-Inverse-Wishart)
 # Lags:          6
@@ -148,11 +148,10 @@ using LinearAlgebra, Random, Distributions, Printf, Statistics
 # =========================
 # Transform to YoY growth rates (matching MANR2026)
 # Skip variables already in growth rates or percentage points
-rename!(df, "trade balance" => :trade_balance, "current consumption" => :current_consumption)
-df.CNYUSDSpot_yoy = (df.CNYUSDSpot ./ lag(df.CNYUSDSpot, 12) .- 1) .* 100
-df.current_consumption_yoy = (df.current_consumption ./ lag(df.current_consumption, 12) .- 1) .* 100
 
-var_syms = [:realgdp_monthly_yoy, :cpi, :FR007, :CNYUSDSpot_yoy, :current_consumption_yoy, :IP_yoy]
+df.CNYUSDSpot_yoy = (df.CNYUSDSpot ./ lag(df.CNYUSDSpot, 12) .- 1) .* 100
+
+var_syms = [:realgdp_monthly_yoy, :cpi, :FR007, :neer_yoy, :IP_yoy]
 all_syms = vcat(var_syms, [:residuals])
 
 df_bvar = dropmissing(df, all_syms)
@@ -169,7 +168,7 @@ H = 24  # IRF horizon (months)
 gdp_col    = findfirst(==(:realgdp_monthly_yoy), var_syms)
 policy_col = findfirst(==(:FR007), var_syms)
 
-var_labels = ["Real GDP Growth", "CPI", "FR007", "CNY/USD Spot", "Current Consumption", "Industrial Production"]
+var_labels = ["Real GDP Growth", "CPI", "FR007", "Real Effective Exchange Rate", "Industrial Value Added"]
 
 println("Variables: ", var_syms)
 println("GDP column: ", gdp_col, " → ", var_syms[gdp_col])
@@ -571,3 +570,7 @@ println("Zero restriction:            GDP = 0 on impact")
 println("Normalization:               +1 pp FR007 on impact")
 println("Bands:                       Posterior credible sets (not CI)")
 ##
+# Save 
+using Serialization
+serialize("narrative_irf_results.jls", Dict(
+    "irf_point" => irf, "irf_draws" => irf_draws, "H" => H))

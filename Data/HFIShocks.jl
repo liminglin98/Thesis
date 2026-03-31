@@ -9,14 +9,9 @@ pwd()
 # Load data (monthly, already merged)
 df = CSV.read("hfi_core_data.csv", DataFrame)
 df.date = Date.(df.date)
-rename!(df, "trade balance" => :trade_balance, "current consumption" => :current_consumption)
 
-# Transformations matching RRShocks_monthly.jl
-df.CNYUSDSpot_yoy          = (df.CNYUSDSpot ./ lag(df.CNYUSDSpot, 12) .- 1) .* 100
-df.current_consumption_yoy = (df.current_consumption ./ lag(df.current_consumption, 12) .- 1) .* 100
-
-var_syms   = [:realgdp_monthly_yoy, :cpi, :FR007, :CNYUSDSpot_yoy, :current_consumption_yoy, :IP_yoy]
-var_labels = ["Real GDP Growth", "CPI", "FR007", "CNY/USD Spot", "Current Consumption", "IP Growth"]
+var_syms   = [:realgdp_monthly_yoy, :cpi, :FR007, :neer_yoy, :IP_yoy]
+var_labels = ["Real GDP Growth", "CPI", "FR007", "Real Effective Exchange Rate", "Industrial Value Added"]
 
 n          = length(var_syms)
 p          = 6    # lags
@@ -326,3 +321,9 @@ println(@sprintf("%-30s  %10.2f  %10.2f", "First-stage F-stat",
 println(@sprintf("%-30s  %10d  %10d", "Valid posterior draws",
     res_policy.valid_draws, res_policy_change.valid_draws))
 ##
+# Save
+using Serialization
+serialize("hfi_irf_ratechange.jls", Dict(
+    "irf_point" => res_policy_change.irf,
+    "irf_draws" => irf_draws[1:res_policy_change.valid_draws, :, :],
+    "H" => H))
