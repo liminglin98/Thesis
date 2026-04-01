@@ -41,7 +41,7 @@ A_list     = bvar["A_list"]         # Vector of n×n lag matrices
 c_vec      = bvar["c"]             # n-vector intercept
 Sigma_u    = bvar["Sigma_u"]       # n×n residual covariance
 Psi        = bvar["Psi"]           # Vector of n×n Wold MA matrices [Ψ₀, Ψ₁, ..., Ψ_H]
-bvar_residuals = bvar["residuals"] # T_eff × n reduced-form residuals
+residuals  = bvar["residuals"]     # T_eff × n reduced-form residuals
 var_labels = bvar["variable_names"]
 dates_est  = bvar["dates"]
 p_lag      = bvar["p"]
@@ -183,21 +183,113 @@ function rule_strict_cpi_targeting(; target=2.0)
     )
 end
 
-function rule_flexible_it(; target_pi=2.0, λ_y=1.0, λ_pi=1.0, λ_i=0.5)
-    # Optimal policy minimising λ_π π² + λ_y y² + λ_i Δi²
-    # (placeholder — requires optpol_fn implementation; for now, strict IT)
+# Time-varying strict targeting: use the actual government work report targets
+# CPI: 3% (2023), 3% (2024), 2% (2025)
+# GDP: 5% (2023–2025)
+function rule_strict_govt_targets(; cnfctl_dates_ref=nothing)
     (
-        label  = "Flexible IT (λ_π=$λ_pi, λ_y=$λ_y, λ_i=$λ_i)",
-        gap_fn = (bl, T) -> fill(target_pi, T) .- bl[:, cpi_idx],
+        label  = "Strict Gov't Targets (CPI 3/3/2%, GDP 5%)",
+        gap_fn = (bl, T) -> begin
+            pi_target = zeros(T)
+            for t in 1:T
+                yr = year(cnfctl_dates_ref[t])
+                pi_target[t] = yr <= 2024 ? 3.0 : 2.0
+            end
+            return pi_target .- bl[:, cpi_idx]
+        end,
     )
 end
 
-# --- Select active rule(s) ---
-rules = [
-    rule_strict_cpi_targeting(target=2.0),
-    # rule_strict_cpi_targeting(target=3.0),
-    # rule_flexible_it(target_pi=2.0, λ_y=1.0, λ_pi=1.0, λ_i=0.5),
-]
+# =============================================================================
+# FLEXIBLE LOSS FUNCTION COUNTERFACTUAL
+# =============================================================================
+#
+# Minimize:
+#   L = λ_π ‖π_base + Π_m ν − π*‖² + λ_y ‖y_base + Y_m ν − y*‖²
+#     + λ_i ‖D(i_base + I_m ν)‖²   + λ_e ‖E_m ν‖²
+#
+# where D is the first-difference matrix (rate smoothing),
+# and E_m ν penalizes monetary-policy-induced NEER YoY deviations from baseline.
+#
+# This is a standard weighted least squares problem in ν:
+#   ν* = argmin ‖W A ν − W b‖²
+# where the stacked system collects all four objectives.
+#
+# Closed-form: ν* = (A'W'WA)⁻¹ A'W'Wb
+# or equivalently solve the normal equations.
+
+function build_first_diff_matrix(T_hor::Int)
+    D = zeros(T_hor - 1, T_hor)
+    for t in 1:T_hor-1
+        D[t, t]   = -1.0
+        D[t, t+1] =  1.0
+    end
+    return D
+end
+
+function cnfctl_flexible(pi_base, y_base, i_base,
+                         Pi_m, Y_m, I_m, E_m,
+                         pi_target, y_target,
+                         λ_pi, λ_y, λ_i, λ_e)
+    T = length(pi_base)
+    K = size(Pi_m, 2)   # 2S shock dimensions
+
+    # Objective 1: CPI gap
+    # λ_π ‖Π_m ν − (π* − π_base)‖²
+    gap_pi = pi_target .- pi_base
+
+    # Objective 2: GDP gap
+    # λ_y ‖Y_m ν − (y* − y_base)‖²
+    gap_y = y_target .- y_base
+
+    # Objective 3: Rate smoothing
+    # λ_i ‖D (i_base + I_m ν)‖² = λ_i ‖D I_m ν + D i_base‖²
+    D = build_first_diff_matrix(T)
+    DI = D * I_m                  # (T-1) × K
+    Di_base = D * i_base          # (T-1)-vector
+
+    # Objective 4: NEER stability
+    # λ_e ‖E_m ν‖²
+
+    # Stack into: min ‖ Ã ν − b̃ ‖²
+    # where rows are weighted by sqrt(λ)
+    sq_pi = sqrt(λ_pi)
+    sq_y  = sqrt(λ_y)
+    sq_i  = sqrt(λ_i)
+    sq_e  = sqrt(λ_e)
+
+    A_stack = vcat(sq_pi * Pi_m,
+                   sq_y  * Y_m,
+                   sq_i  * DI,
+                   sq_e  * E_m)
+
+    b_stack = vcat(sq_pi * gap_pi,
+                   sq_y  * gap_y,
+                   sq_i  * (-Di_base),   # target for D*i is zero ⇒ residual = -(D*i_base)
+                   sq_e  * zeros(T))      # target for E_m ν is zero
+
+    # Solve via least squares
+    nu_tilde = A_stack \ b_stack
+
+    # Reconstruct counterfactual paths
+    pi_cnfctl = pi_base .+ Pi_m * nu_tilde
+    y_cnfctl  = y_base  .+ Y_m  * nu_tilde
+    i_cnfctl  = i_base  .+ I_m  * nu_tilde
+    e_cnfctl  = E_m * nu_tilde              # deviation from baseline NEER
+
+    # Loss components (for diagnostics)
+    L_pi = λ_pi * sum((pi_cnfctl .- pi_target).^2)
+    L_y  = λ_y  * sum((y_cnfctl  .- y_target).^2)
+    L_i  = λ_i  * sum((D * i_cnfctl).^2)
+    L_e  = λ_e  * sum(e_cnfctl.^2)
+    L_total = L_pi + L_y + L_i + L_e
+
+    return (pi_cnfctl=pi_cnfctl, y_cnfctl=y_cnfctl, i_cnfctl=i_cnfctl,
+            e_cnfctl=e_cnfctl, nu_tilde=nu_tilde,
+            loss=Dict("total"=>L_total, "pi"=>L_pi, "y"=>L_y, "i"=>L_i, "e"=>L_e))
+end
+
+# --- Rules are defined after cnfctl_dates (Section 6) ---
 
 # =============================================================================
 # 6) COUNTERFACTUAL SETTINGS & BASELINE
@@ -235,6 +327,12 @@ hist_dates     = dates_all[hist_start_idx:fcst_date_idx-1]
 hist_data      = Y_all[hist_start_idx:fcst_date_idx-1, :]
 
 println("\nCounterfactual: $cnfctl_start — $cnfctl_end ($fcst_hor months)")
+
+# --- Select active rules (now that cnfctl_dates is available) ---
+rules = [
+    rule_strict_cpi_targeting(target=2.0),
+    rule_strict_govt_targets(cnfctl_dates_ref=cnfctl_dates),
+]
 
 # =============================================================================
 # 6) BUILD POLICY TRANSMISSION MAP Θ_ν — TWO SHOCK SERIES
@@ -276,10 +374,20 @@ function build_two_shock_map(irf_col_1::Vector{Float64}, irf_col_2::Vector{Float
     return hcat(M1, M2)   # T × 2S
 end
 
+# IRF variable ordering (from RRShocks_monthly.jl / HFIShocks.jl):
+#   1: realgdp_monthly_yoy  2: cpi  3: FR007  4: neer_yoy  5: IP_yoy
+# This differs from the BVAR ordering — use separate indices for IRF matrices.
+irf_gdp_idx   = 1
+irf_cpi_idx   = 2
+irf_fr007_idx = 3
+irf_neer_idx  = 4
+irf_ip_idx    = 5
+
 # Point estimate transmission maps — horizontally concatenated
-Pi_m = build_two_shock_map(narr_point[:, cpi_idx],   hfi_point[:, cpi_idx],   fcst_hor)
-Y_m  = build_two_shock_map(narr_point[:, gdp_idx],   hfi_point[:, gdp_idx],   fcst_hor)
-I_m  = build_two_shock_map(narr_point[:, fr007_idx], hfi_point[:, fr007_idx], fcst_hor)
+Pi_m = build_two_shock_map(narr_point[:, irf_cpi_idx],   hfi_point[:, irf_cpi_idx],   fcst_hor)
+Y_m  = build_two_shock_map(narr_point[:, irf_gdp_idx],   hfi_point[:, irf_gdp_idx],   fcst_hor)
+I_m  = build_two_shock_map(narr_point[:, irf_fr007_idx], hfi_point[:, irf_fr007_idx], fcst_hor)
+E_m  = build_two_shock_map(narr_point[:, irf_neer_idx],  hfi_point[:, irf_neer_idx],  fcst_hor)
 
 shock_max = size(Pi_m, 2)   # = 2S
 S_per     = shock_max ÷ 2   # S per shock series
@@ -311,15 +419,15 @@ end
 
 function posterior_bands(gap, pi_base, y_base, i_base,
                          narr_draws, hfi_draws, n_draws_irf, fcst_hor,
-                         cpi_idx, gdp_idx, fr007_idx)
+                         irf_cpi_idx, irf_gdp_idx, irf_fr007_idx)
     pi_d = zeros(fcst_hor, n_draws_irf)
     y_d  = zeros(fcst_hor, n_draws_irf)
     i_d  = zeros(fcst_hor, n_draws_irf)
     nv = 0
     for d in 1:n_draws_irf
-        Pi_d = build_two_shock_map(narr_draws[d,:,cpi_idx],   hfi_draws[d,:,cpi_idx],   fcst_hor)
-        Y_d  = build_two_shock_map(narr_draws[d,:,gdp_idx],   hfi_draws[d,:,gdp_idx],   fcst_hor)
-        I_d  = build_two_shock_map(narr_draws[d,:,fr007_idx], hfi_draws[d,:,fr007_idx], fcst_hor)
+        Pi_d = build_two_shock_map(narr_draws[d,:,irf_cpi_idx],   hfi_draws[d,:,irf_cpi_idx],   fcst_hor)
+        Y_d  = build_two_shock_map(narr_draws[d,:,irf_gdp_idx],   hfi_draws[d,:,irf_gdp_idx],   fcst_hor)
+        I_d  = build_two_shock_map(narr_draws[d,:,irf_fr007_idx], hfi_draws[d,:,irf_fr007_idx], fcst_hor)
         try
             p, y, i, _ = cnfctl_scenario(gap, y_base, i_base, pi_base, Pi_d, Y_d, I_d)
             pi_d[:,d] = p; y_d[:,d] = y; i_d[:,d] = i; nv += 1
@@ -405,7 +513,7 @@ for rule in rules
     # Posterior bands
     bands = posterior_bands(gap, pi_base, y_base, i_base,
                 narr_draws, hfi_draws, n_draws_irf, fcst_hor,
-                cpi_idx, gdp_idx, fr007_idx)
+                irf_cpi_idx, irf_gdp_idx, irf_fr007_idx)
 
     # Plot (Wolf D.2 style)
     plot_counterfactual(rule.label, cnfctl_dates, pi_c, y_c, i_c,
@@ -423,6 +531,140 @@ for rule in rules
 end
 
 # =============================================================================
+# 11b) FLEXIBLE LOSS FUNCTION COUNTERFACTUAL
+# =============================================================================
+
+println("\n" * "="^70)
+println("FLEXIBLE LOSS FUNCTION COUNTERFACTUAL")
+println("="^70)
+
+# Time-varying targets
+pi_target_flex = [year(d) <= 2024 ? 3.0 : 2.0 for d in cnfctl_dates]
+y_target_flex  = fill(5.0, fcst_hor)
+
+e_base = baseline_fc[:, neer_idx]
+
+# --- Baseline lambda configuration ---
+# λ_pi = 1.0 (normalize), then vary relative weights
+lambda_configs = [
+    (λ_pi=1.0, λ_y=0.5, λ_i=1.0,  λ_e=0.5,  label="Balanced"),
+    (λ_pi=1.0, λ_y=0.5, λ_i=5.0,  λ_e=1.0,  label="Strong smoothing"),
+    (λ_pi=1.0, λ_y=0.5, λ_i=10.0, λ_e=2.0,  label="Very strong smoothing"),
+    (λ_pi=1.0, λ_y=1.0, λ_i=2.0,  λ_e=1.0,  label="Output-focused"),
+]
+
+flex_results = Dict{String, Any}()
+
+for cfg in lambda_configs
+    println("\n--- $(cfg.label) (λ_π=$(cfg.λ_pi), λ_y=$(cfg.λ_y), λ_i=$(cfg.λ_i), λ_e=$(cfg.λ_e)) ---")
+
+    res = cnfctl_flexible(pi_base, y_base, i_base,
+                          Pi_m, Y_m, I_m, E_m,
+                          pi_target_flex, y_target_flex,
+                          cfg.λ_pi, cfg.λ_y, cfg.λ_i, cfg.λ_e)
+
+    # Diagnostics
+    println(@sprintf("  Loss: total=%.1f  π=%.1f  y=%.1f  Δi=%.1f  e=%.1f",
+        res.loss["total"], res.loss["pi"], res.loss["y"], res.loss["i"], res.loss["e"]))
+    println(@sprintf("  CPI:   mean=%.2f%%  range=[%.2f, %.2f]",
+        mean(res.pi_cnfctl), minimum(res.pi_cnfctl), maximum(res.pi_cnfctl)))
+    println(@sprintf("  GDP:   mean=%.2f%%  range=[%.2f, %.2f]",
+        mean(res.y_cnfctl), minimum(res.y_cnfctl), maximum(res.y_cnfctl)))
+    println(@sprintf("  FR007: mean=%.2f%%  range=[%.2f, %.2f]",
+        mean(res.i_cnfctl), minimum(res.i_cnfctl), maximum(res.i_cnfctl)))
+    println(@sprintf("  NEER Δ: mean=%.2f%%  range=[%.2f, %.2f]",
+        mean(res.e_cnfctl), minimum(res.e_cnfctl), maximum(res.e_cnfctl)))
+
+    # 4-panel plot: CPI, GDP, FR007, NEER
+    blue = RGB(0.45, 0.62, 0.70)
+
+    fig = plot(layout=(2, 2), size=(1200, 700), margin=8Plots.mm,
+        plot_title="Flexible IT: $(cfg.label)")
+
+    # Panel 1: CPI
+    plot!(fig[1], hist_dates, hist_data[:, cpi_idx], color=:black, lw=2.5, label="Data")
+    plot!(fig[1], actual_dates, actual_data[:, cpi_idx], color=:black, lw=2.5, label="")
+    plot!(fig[1], cnfctl_dates, pi_base, color=:gray, lw=2, ls=:dash, label="Forecast")
+    plot!(fig[1], cnfctl_dates, pi_target_flex, color=:red, lw=1.5, ls=:dot, label="Target")
+    plot!(fig[1], cnfctl_dates, res.pi_cnfctl, color=blue, lw=2.5, label="Counterfact'l")
+    title!(fig[1], "CPI YoY (%)")
+
+    # Panel 2: GDP
+    plot!(fig[2], hist_dates, hist_data[:, gdp_idx], color=:black, lw=2.5, label="Data")
+    plot!(fig[2], actual_dates, actual_data[:, gdp_idx], color=:black, lw=2.5, label="")
+    plot!(fig[2], cnfctl_dates, y_base, color=:gray, lw=2, ls=:dash, label="Forecast")
+    plot!(fig[2], cnfctl_dates, y_target_flex, color=:red, lw=1.5, ls=:dot, label="Target")
+    plot!(fig[2], cnfctl_dates, res.y_cnfctl, color=blue, lw=2.5, label="Counterfact'l")
+    title!(fig[2], "Real GDP YoY (%)")
+
+    # Panel 3: FR007
+    plot!(fig[3], hist_dates, hist_data[:, fr007_idx], color=:black, lw=2.5, label="Data")
+    plot!(fig[3], actual_dates, actual_data[:, fr007_idx], color=:black, lw=2.5, label="")
+    plot!(fig[3], cnfctl_dates, i_base, color=:gray, lw=2, ls=:dash, label="Forecast")
+    plot!(fig[3], cnfctl_dates, res.i_cnfctl, color=blue, lw=2.5, label="Counterfact'l")
+    title!(fig[3], "FR007 (%)")
+
+    # Panel 4: NEER (deviation from baseline)
+    plot!(fig[4], hist_dates, hist_data[:, neer_idx], color=:black, lw=2.5, label="Data")
+    plot!(fig[4], actual_dates, actual_data[:, neer_idx], color=:black, lw=2.5, label="")
+    plot!(fig[4], cnfctl_dates, e_base, color=:gray, lw=2, ls=:dash, label="Forecast")
+    plot!(fig[4], cnfctl_dates, e_base .+ res.e_cnfctl, color=blue, lw=2.5, label="Counterfact'l")
+    title!(fig[4], "NEER YoY (%)")
+
+    display(fig)
+    fname = "cnfctl_flex_$(replace(lowercase(cfg.label), " " => "_")).png"
+    savefig(fig, fname)
+    println("  Saved: $fname")
+
+    flex_results[cfg.label] = res
+end
+
+# =============================================================================
+# 11c) POLICY FRONTIER: vary λ_i/λ_π ratio
+# =============================================================================
+
+println("\n" * "="^70)
+println("POLICY FRONTIER: inflation gap vs rate volatility")
+println("="^70)
+
+λ_i_grid = [0.0, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0]
+frontier_pi_gap  = Float64[]
+frontier_i_vol   = Float64[]
+frontier_y_gap   = Float64[]
+frontier_labels  = String[]
+
+for λ_i_val in λ_i_grid
+    res = cnfctl_flexible(pi_base, y_base, i_base,
+                          Pi_m, Y_m, I_m, E_m,
+                          pi_target_flex, y_target_flex,
+                          1.0, 0.5, λ_i_val, 0.5)
+    rms_pi = sqrt(mean((res.pi_cnfctl .- pi_target_flex).^2))
+    D_fc = build_first_diff_matrix(fcst_hor)
+    rms_di = sqrt(mean((D_fc * res.i_cnfctl).^2))
+    rms_y  = sqrt(mean((res.y_cnfctl .- y_target_flex).^2))
+    push!(frontier_pi_gap, rms_pi)
+    push!(frontier_i_vol, rms_di)
+    push!(frontier_y_gap, rms_y)
+    push!(frontier_labels, "λ_i=$(λ_i_val)")
+    println(@sprintf("  λ_i=%6.1f → RMSE(π)=%.3f  RMSE(Δi)=%.3f  RMSE(y)=%.3f",
+        λ_i_val, rms_pi, rms_di, rms_y))
+end
+
+p_front = plot(frontier_i_vol, frontier_pi_gap,
+    xlabel="Rate volatility: RMSE(Δi) (pp/month)",
+    ylabel="Inflation gap: RMSE(π − π*) (pp)",
+    title="Policy Frontier: Inflation Target vs Rate Smoothing",
+    marker=:circle, markersize=6, lw=2, color=RGB(0.45, 0.62, 0.70),
+    legend=false, size=(700, 500), margin=8Plots.mm)
+for (k, lbl) in enumerate(frontier_labels)
+    annotate!(p_front, frontier_i_vol[k], frontier_pi_gap[k],
+        text(lbl, :left, 7, :gray40))
+end
+display(p_front)
+savefig(p_front, "cnfctl_policy_frontier.png")
+println("  Saved: cnfctl_policy_frontier.png")
+
+# =============================================================================
 # 12) SAVE
 # =============================================================================
 
@@ -436,7 +678,12 @@ serialize("counterfactual_results.jls", Dict(
     "hist_dates"    => hist_dates,
     "rules"         => [r.label for r in rules],
     "all_results"   => all_results,
-    "Pi_m" => Pi_m, "Y_m" => Y_m, "I_m" => I_m,
+    "flex_results"  => flex_results,
+    "pi_target_flex" => pi_target_flex,
+    "y_target_flex"  => y_target_flex,
+    "frontier"      => Dict("pi_gap"=>frontier_pi_gap, "i_vol"=>frontier_i_vol,
+                            "y_gap"=>frontier_y_gap, "labels"=>frontier_labels),
+    "Pi_m" => Pi_m, "Y_m" => Y_m, "I_m" => I_m, "E_m" => E_m,
     "S_per" => S_per, "n_shocks" => n_shocks,
 ))
 println("\nResults saved to counterfactual_results.jls")
