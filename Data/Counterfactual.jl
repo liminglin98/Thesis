@@ -321,7 +321,7 @@ T_actual    = min(fcst_hor, size(Y_all, 1) - fcst_date_idx + 1)
 actual_data = Y_all[fcst_date_idx:min(fcst_date_idx + T_actual - 1, end), :]
 actual_dates = dates_all[fcst_date_idx:min(fcst_date_idx + T_actual - 1, end)]
 
-n_history      = 24
+n_history      = 18
 hist_start_idx = max(1, fcst_date_idx - n_history)
 hist_dates     = dates_all[hist_start_idx:fcst_date_idx-1]
 hist_data      = Y_all[hist_start_idx:fcst_date_idx-1, :]
@@ -688,3 +688,24 @@ serialize("counterfactual_results.jls", Dict(
 ))
 println("\nResults saved to counterfactual_results.jls")
 println("✓ Counterfactual analysis complete.")
+## Generate a diagnostic plot: CPI forecast starting from 2021
+diag_start    = Date(2021, 1, 1)
+diag_date_idx = findfirst(d -> d >= diag_start, dates_all)
+diag_hor      = size(Y_all, 1) - diag_date_idx + 1
+diag_dates    = dates_all[diag_date_idx:end]
+diag_fc       = forecast_from_date(Y_all, A_list, c_vec, diag_date_idx - 1, diag_hor)
+
+# Historical data before 2021 for context (12 months)
+pre_mask = hist_dates .>= diag_start - Month(12)
+
+p_cpi = plot(hist_dates[pre_mask], hist_data[pre_mask, cpi_idx],
+    label="Historical", color=:black, lw=2,
+    xlabel="Date", ylabel="CPI YoY (%)", title="CPI: BVAR Forecast from 2021 vs Actual")
+plot!(p_cpi, actual_dates, actual_data[:, cpi_idx],
+    label="Actual (post-2023)", color=:black, lw=2, marker=:circle, markersize=4)
+plot!(p_cpi, diag_dates, diag_fc[:, cpi_idx],
+    label="Baseline Forecast (from 2021)", color=:blue, lw=2, ls=:dash)
+vline!(p_cpi, [diag_start], color=:gray, lw=1, ls=:dot, label="Forecast start")
+display(p_cpi)
+##
+savefig(p_cpi, "cpi_forecast_diag_2021.png")
