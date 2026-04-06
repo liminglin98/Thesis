@@ -1,14 +1,10 @@
-# Outputs (regenerable from code)
-outputs/
+# Derived data (regenerable via: python src/python/run_all.py)
 data/derived/
 data/raw/cache/
 
 # Python
 __pycache__/
 *.pyc
-
-# Julia serialized files
-*.jls
 
 # macOS
 .DS_Store
