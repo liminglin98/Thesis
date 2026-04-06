@@ -1,8 +1,24 @@
+# Outputs (regenerable from code)
+outputs/
+data/derived/
+data/raw/cache/
+
+# Python
+__pycache__/
+*.pyc
+
+# Julia serialized files
+*.jls
+
+# macOS
+.DS_Store
+Icon?
+
+# Large PDFs in Literature Review
 Literature Review/Bayesian Estimation of DSGE Models.pdf
 Literature Review/bh_fiscal-monetary.pdf
 Literature Review/Econometrica - 2023 - McKay - What Can Time‐Series Regressions Tell Us About Policy Counterfactuals.pdf
 Literature Review/f215515.slides.pdf
-Literature Review/Icon
 Literature Review/mp_modelcnfctls.pdf
 Literature Review/The Fiscal Theory of the Price Level John Howland Cochrane.pdf
 Literature Review/w34056.pdf
@@ -10,9 +26,3 @@ Literature Review/w34626.pdf
 Literature Review/work641.pdf
 Literature Review/wpiea2022074-print-pdf (1).pdf
 Literature Review/Monetary Policy Transmission/1-s2.0-S0378426625000020-main.pdf
-Literature Review/Monetary Policy Transmission/Icon
-Literature Review/Icon
-Literature Review/Monetary Policy Transmission/Icon
-Data/CMPI/Icon
-Data/Icon
-.gitignore
