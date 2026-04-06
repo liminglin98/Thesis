@@ -44,10 +44,11 @@ def parse_cmpi_sheets():
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
         df = df[df["date"].dt.year >= 2000]
 
-        if sheet_name in SHEET_RENAMES:
-            df.rename(columns=SHEET_RENAMES[sheet_name], inplace=True)
-
         clean_name = re.sub(r"[（）()]", "", sheet_name).strip()
+        renames = SHEET_RENAMES.get(sheet_name) or SHEET_RENAMES.get(clean_name)
+        if renames:
+            df.rename(columns=renames, inplace=True)
+
         cmpi_dfs[clean_name] = df
     return cmpi_dfs
 
