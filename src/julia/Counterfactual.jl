@@ -255,6 +255,7 @@ for yc in year_configs
     pi_base = baseline_fc[:, cpi_idx]
     y_base  = baseline_fc[:, gdp_idx]
     i_base  = baseline_fc[:, fr007_idx]
+    e_base  = baseline_fc[:, neer_idx]
 
     pi_target = [cpi_target_for_year(year(d)) for d in cnfctl_dates]
     y_target  = [gdp_target_for_year(year(d)) for d in cnfctl_dates]
@@ -306,29 +307,33 @@ for yc in year_configs
         )
     end
 
-    # --- Build combined 3×3 figure ---
+    # --- Build combined 3×4 figure (rows=rules, cols=CPI/GDP/FR007/NEER) ---
     blue  = RGB(0.45, 0.62, 0.70)
     lblue = RGB(0.45, 0.62, 0.70)
+    n_cols = 4
 
-    fig = plot(layout=(3, 3), size=(1500, 1000), margin=6Plots.mm,
+    fig = plot(layout=(3, n_cols), size=(1800, 1000), margin=6Plots.mm,
         plot_title="Counterfactual from $(cfctl_year) — sample $(yc.sample)")
 
-    # Columns: CPI, GDP, FR007
+    # Continuous actual data line: history + counterfactual window (no gap)
+    all_plot_dates = vcat(hist_dates, actual_dates_window)
+    all_plot_data  = vcat(hist_data, actual_data)
+
+    # Columns: CPI, GDP, FR007, NEER
     col_vars = [
-        (idx=cpi_idx,   cnfctl=:pi_cnfctl, base=pi_base, lb=:pi_lb, ub=:pi_ub, tgt=pi_target, col_title="CPI YoY (%)"),
-        (idx=gdp_idx,   cnfctl=:y_cnfctl,  base=y_base,  lb=:y_lb,  ub=:y_ub,  tgt=y_target,  col_title="Real GDP YoY (%)"),
-        (idx=fr007_idx, cnfctl=:i_cnfctl,  base=i_base,  lb=:i_lb,  ub=:i_ub,  tgt=nothing,   col_title="FR007 (%)"),
+        (idx=cpi_idx,   cnfctl=:pi_cnfctl, base=pi_base, e_adj=false, lb=:pi_lb, ub=:pi_ub, tgt=pi_target,  col_title="CPI YoY (%)"),
+        (idx=gdp_idx,   cnfctl=:y_cnfctl,  base=y_base,  e_adj=false, lb=:y_lb,  ub=:y_ub,  tgt=y_target,   col_title="Real GDP YoY (%)"),
+        (idx=fr007_idx, cnfctl=:i_cnfctl,  base=i_base,  e_adj=false, lb=:i_lb,  ub=:i_ub,  tgt=nothing,    col_title="FR007 (%)"),
+        (idx=neer_idx,  cnfctl=:e_cnfctl,  base=e_base,  e_adj=true,  lb=:e_lb,  ub=:e_ub,  tgt=nothing,    col_title="NEER YoY (%)"),
     ]
 
     for (r, (rule, rr)) in enumerate(zip(rules, rule_results))
         for (c, cv) in enumerate(col_vars)
-            sp = (r - 1) * 3 + c
+            sp = (r - 1) * n_cols + c
 
-            # Actual data
-            plot!(fig[sp], hist_dates, hist_data[:, cv.idx],
+            # Actual data — one continuous line
+            plot!(fig[sp], all_plot_dates, all_plot_data[:, cv.idx],
                 color=:black, lw=2, label=(r==1 && c==1 ? "Data" : ""))
-            plot!(fig[sp], actual_dates_window, actual_data[:, cv.idx],
-                color=:black, lw=2, label="")
 
             # Baseline forecast
             plot!(fig[sp], cnfctl_dates, cv.base,
@@ -343,16 +348,38 @@ for yc in year_configs
             # 68% posterior bands
             bd_lb = getfield(rr.bands, cv.lb)
             bd_ub = getfield(rr.bands, cv.ub)
+            # For NEER, bands are deviations from baseline — add e_base
+            if cv.e_adj
+                bd_lb = cv.base .+ bd_lb
+                bd_ub = cv.base .+ bd_ub
+            end
             plot!(fig[sp], cnfctl_dates, bd_lb,
                 fillrange=bd_ub, fillalpha=0.2, fillcolor=lblue, lw=0,
                 label=(r==1 && c==1 ? "68%" : ""))
 
             # Counterfactual path
             cnfctl_path = getfield(rr.res, cv.cnfctl)
+            if cv.e_adj
+                cnfctl_path = cv.base .+ cnfctl_path
+            end
             plot!(fig[sp], cnfctl_dates, cnfctl_path,
                 color=blue, lw=2.5, label=(r==1 && c==1 ? "Counterfact'l" : ""))
 
             hline!(fig[sp], [0], color=:gray, ls=:dot, alpha=0.3, label="")
+
+            # Set y-axis limits: use actual data range + counterfactual range, with padding
+            all_vals = vcat(
+                all_plot_data[:, cv.idx],
+                cnfctl_path,
+                cv.base,
+                bd_lb, bd_ub,
+            )
+            all_vals = filter(!isnan, all_vals)
+            if !isempty(all_vals)
+                ylo, yhi = minimum(all_vals), maximum(all_vals)
+                pad = 0.15 * max(yhi - ylo, 1.0)
+                ylims!(fig[sp], (ylo - pad, yhi + pad))
+            end
 
             # Title on row 1 only; ylabel on column 1 only
             if r == 1
