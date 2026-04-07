@@ -14,6 +14,31 @@ function output_dir(subfolder::String)
     return d
 end
 
+# --- Categorized output directories ---
+function intermediate_dir()
+    d = joinpath(PROJECT_ROOT, "outputs", "intermediate")
+    mkpath(d)
+    return d
+end
+
+function main_results_dir()
+    d = joinpath(PROJECT_ROOT, "outputs", "main_results")
+    mkpath(d)
+    return d
+end
+
+function diagnostics_dir()
+    d = joinpath(PROJECT_ROOT, "outputs", "diagnostics")
+    mkpath(d)
+    return d
+end
+
+function robustness_dir()
+    d = joinpath(PROJECT_ROOT, "outputs", "robustness")
+    mkpath(d)
+    return d
+end
+
 # --- VAR lag matrices ---
 
 function get_lag_matrices(B::Matrix{Float64}, n::Int, p::Int)

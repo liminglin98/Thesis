@@ -12,7 +12,9 @@ using Random, Distributions
 using LinearAlgebra
 ##
 include(joinpath(@__DIR__, "common.jl"))
-const OUTPUT_DIR = output_dir("RRShocks")
+const ROBUST_DIR = robustness_dir()
+const MAIN_DIR   = main_results_dir()
+const INTER_DIR  = intermediate_dir()
 ##
 # Load the data
 df = CSV.read(joinpath(DERIVED_DIR, "romer_china_data.csv"), DataFrame);
@@ -93,7 +95,7 @@ plot!(p_res, df_ex2020.date, df_ex2020.policy_residual_ex,
     label="Excl. 2020", color=:red, linestyle=:dash, alpha=0.7)
 hline!([0.0], linestyle=:dot, color=:black, alpha=0.5, label="")
 display(p_res)
-savefig(p_res, joinpath(OUTPUT_DIR, "FR007_residuals_comparison.png"))
+savefig(p_res, joinpath(ROBUST_DIR, "FR007_residuals_comparison.png"))
 ##
 # Plot actual vs predicted: full sample vs excluding 2020
 p_fit = plot(df.date, df.FR007,
@@ -106,7 +108,7 @@ plot!(p_fit, df.date, df.pred_FR007,
 plot!(p_fit, df_ex2020.date, df_ex2020.pred_FR007_ex,
     label="Predicted (excl. 2020)", color=:red, linestyle=:dot)
 display(p_fit)
-savefig(p_fit, joinpath(OUTPUT_DIR, "FR007_fit_comparison.png"))
+savefig(p_fit, joinpath(ROBUST_DIR, "FR007_fit_comparison.png"))
 ##
 # Plot coefficient comparison
 coef_full   = coef(model1)
@@ -123,7 +125,7 @@ plot!(p_coef, (1:n_coef) .+ 0.3, coef_ex,
     seriestype=:bar, label="Excl. 2020",
     alpha=0.6, color=:red, bar_width=0.3)
 display(p_coef)
-savefig(p_coef, joinpath(OUTPUT_DIR, "FR007_coef_comparison.png"))
+savefig(p_coef, joinpath(ROBUST_DIR, "FR007_coef_comparison.png"))
 
 
 
@@ -495,7 +497,7 @@ plot_bvar = plot(p_plots...,
     size = (380 * n_cols, 300 * n_rows),
     plot_title = "BVAR + IV-SVAR: Contractionary MP Shock (+1 pp FR007)\nMinnesota prior, RR instrument, GDP zero on impact")
 display(plot_bvar)
-savefig(plot_bvar, joinpath(OUTPUT_DIR, "irf_bvar_iv_svar.png"))
+savefig(plot_bvar, joinpath(MAIN_DIR, "irf_bvar_iv_svar.png"))
 
 # =========================
 # 10) Diagnostics
@@ -516,5 +518,5 @@ println("Bands:                       Posterior credible sets (not CI)")
 ##
 # Save 
 using Serialization
-serialize(joinpath(OUTPUT_DIR, "narrative_irf_results.jls"), Dict(
+serialize(joinpath(INTER_DIR, "narrative_irf_results.jls"), Dict(
     "irf_point" => irf, "irf_draws" => irf_draws, "H" => H))

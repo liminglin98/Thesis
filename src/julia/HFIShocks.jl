@@ -4,7 +4,9 @@ using Plots, Dates, ShiftedArrays
 using Printf, Random, Distributions, LinearAlgebra
 ##
 include(joinpath(@__DIR__, "common.jl"))
-const OUTPUT_DIR = output_dir("HFIShocks")
+const MAIN_DIR   = main_results_dir()
+const ROBUST_DIR = robustness_dir()
+const INTER_DIR  = intermediate_dir()
 ##
 # Load data (monthly, already merged)
 df = CSV.read(joinpath(DERIVED_DIR, "hfi_core_data.csv"), DataFrame)
@@ -218,8 +220,8 @@ end
 ##
 fig1 = plot_irfs(res_policy,        "HFI: any policy announcement", :darkblue)
 fig2 = plot_irfs(res_policy_change, "HFI: rate change only",         :darkred)
-savefig(fig1, joinpath(OUTPUT_DIR, "irf_hfi_shock_policy.png"))
-savefig(fig2, joinpath(OUTPUT_DIR, "irf_hfi_shock_policy_change.png"))
+savefig(fig1, joinpath(ROBUST_DIR, "irf_hfi_shock_policy.png"))
+savefig(fig2, joinpath(MAIN_DIR, "irf_hfi_shock_policy_change.png"))
 
 ##
 # ============================================================
@@ -249,7 +251,7 @@ fig_compare = plot(p_compare...,
     size=(380*n_cols, 300*ceil(Int, n/n_cols)),
     plot_title="HFI Shock Comparison: Any Announcement vs Rate Change Only")
 display(fig_compare)
-savefig(fig_compare, joinpath(OUTPUT_DIR, "irf_hfi_comparison.png"))
+savefig(fig_compare, joinpath(MAIN_DIR, "irf_hfi_comparison.png"))
 
 ##
 # ============================================================
@@ -267,7 +269,7 @@ println(@sprintf("%-30s  %10d  %10d", "Valid posterior draws",
 ##
 # Save
 using Serialization
-serialize(joinpath(OUTPUT_DIR, "hfi_irf_ratechange.jls"), Dict(
+serialize(joinpath(INTER_DIR, "hfi_irf_ratechange.jls"), Dict(
     "irf_point" => res_policy_change.irf,
     "irf_draws" => irf_draws[1:res_policy_change.valid_draws, :, :],
     "H" => H))

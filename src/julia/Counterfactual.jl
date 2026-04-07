@@ -28,10 +28,8 @@
 using LinearAlgebra, Statistics, Printf, Dates, Serialization, Plots
 
 include(joinpath(@__DIR__, "common.jl"))
-const OUTPUT_DIR = output_dir("Counterfactual")
-const LTP_DIR = joinpath(PROJECT_ROOT, "outputs", "LTP")
-const RR_DIR = joinpath(PROJECT_ROOT, "outputs", "RRShocks")
-const HFI_DIR = joinpath(PROJECT_ROOT, "outputs", "HFIShocks")
+const MAIN_DIR  = main_results_dir()
+const INTER_DIR = intermediate_dir()
 
 # =============================================================================
 # 1) LOAD SAVED BVAR RESULTS (from LTP.jl)
@@ -39,7 +37,7 @@ const HFI_DIR = joinpath(PROJECT_ROOT, "outputs", "HFIShocks")
 
 # --- Load BVAR results ---
 # Expected keys: A_list, c, Sigma_u, Psi, residuals, variable_names, dates, p, H
-bvar = deserialize(joinpath(LTP_DIR, "bvar_results.jls"))
+bvar = deserialize(joinpath(INTER_DIR, "bvar_results.jls"))
 
 A_list     = bvar["A_list"]         # Vector of n×n lag matrices
 c_vec      = bvar["c"]             # n-vector intercept
@@ -119,13 +117,13 @@ println("Policy instrument: $(var_labels[fr007_idx]) (index $fr007_idx)")
 #         "irf_draws" => irf_draws_from_res, "H" => H))
 
 # --- Shock 1: Narrative (Chen/Xiao/Zha) ---
-narr_data   = deserialize(joinpath(RR_DIR, "narrative_irf_results.jls"))
+narr_data   = deserialize(joinpath(INTER_DIR, "narrative_irf_results.jls"))
 narr_point  = narr_data["irf_point"]     # (H_narr+1) × n
 narr_draws  = narr_data["irf_draws"]     # n_draws_narr × (H_narr+1) × n
 H_narr      = narr_data["H"]
 
 # --- Shock 2: HFI (rate-change-only) ---
-hfi_data    = deserialize(joinpath(HFI_DIR, "hfi_irf_ratechange.jls"))
+hfi_data    = deserialize(joinpath(INTER_DIR, "hfi_irf_ratechange.jls"))
 hfi_point   = hfi_data["irf_point"]      # (H_hfi+1) × n
 hfi_draws   = hfi_data["irf_draws"]      # n_draws_hfi × (H_hfi+1) × n
 H_hfi       = hfi_data["H"]
@@ -460,7 +458,7 @@ function plot_counterfactual(rule_label, cnfctl_dates, pi_cnfctl, y_cnfctl, i_cn
 
     display(fig)
     fname = replace(lowercase(save_prefix), " " => "_") * ".png"
-    savefig(fig, joinpath(OUTPUT_DIR, fname))
+    savefig(fig, joinpath(MAIN_DIR, fname))
     println("  Saved: $fname")
     return fig
 end
@@ -608,7 +606,7 @@ for sc in scenarios
 
     display(fig)
     fname = "cnfctl_flex_balanced_$(sc.label).png"
-    savefig(fig, joinpath(OUTPUT_DIR, fname))
+    savefig(fig, joinpath(MAIN_DIR, fname))
     println("  Saved: $fname")
 
     # Store results
@@ -631,7 +629,7 @@ end
 # 12) SAVE
 # =============================================================================
 
-serialize(joinpath(OUTPUT_DIR, "counterfactual_results.jls"), Dict(
+serialize(joinpath(INTER_DIR, "counterfactual_results.jls"), Dict(
     "scenarios"     => all_scenario_results,
     "lambda_config" => Dict("λ_pi"=>λ_pi, "λ_y"=>λ_y, "λ_i"=>λ_i, "λ_e"=>λ_e),
     "n_shocks"      => n_shocks,

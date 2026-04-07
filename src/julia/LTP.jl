@@ -9,7 +9,8 @@ using LinearAlgebra
 using Serialization
 
 include(joinpath(@__DIR__, "common.jl"))
-const OUTPUT_DIR = output_dir("LTP")
+const DIAG_DIR = diagnostics_dir()
+const INTER_DIR = intermediate_dir()
 ##
 # =============================================================================
 # BVAR with Minnesota Prior (Giannone, Lenza & Primiceri 2015)
@@ -235,7 +236,7 @@ for j in 2:n
 end
 hline!([0], color=:black, linestyle=:dash, alpha=0.4, label="")
 display(p_wold)
-savefig(p_wold, joinpath(OUTPUT_DIR, "bvar_wold_decay.png"))
+savefig(p_wold, joinpath(DIAG_DIR, "bvar_wold_decay.png"))
 ##
 # Residuals
 p_resid_plots = []
@@ -254,7 +255,7 @@ p_resid = plot(p_resid_plots...,
     size=(380*n_cols, 280*n_rows),
     plot_title="BVAR Reduced-Form Residuals")
 display(p_resid)
-savefig(p_resid, joinpath(OUTPUT_DIR, "bvar_residuals.png"))
+savefig(p_resid, joinpath(DIAG_DIR, "bvar_residuals.png"))
 ##
 # In-sample fit + forecast: GDP (variable 1)
 gdp_idx = 1
@@ -269,7 +270,7 @@ plot!(p_gdp, fc_dates, fc[:, gdp_idx],
     linewidth=2, marker=:circle, markersize=3)
 hline!([0], color=:gray, linestyle=:dot, alpha=0.5, label="")
 display(p_gdp)
-savefig(p_gdp, joinpath(OUTPUT_DIR, "bvar_gdp_forecast.png"))
+savefig(p_gdp, joinpath(DIAG_DIR, "bvar_gdp_forecast.png"))
 ##
 # ── 13) Save results ──────────────────────────────────────────────────────────
 results = Dict(
@@ -283,5 +284,5 @@ results = Dict(
     "p"              => p,
     "H"              => H,
 )
-serialize(joinpath(OUTPUT_DIR, "bvar_results.jls"), results)
-println("\nResults saved to $(joinpath(OUTPUT_DIR, \"bvar_results.jls\"))")
+serialize(joinpath(INTER_DIR, "bvar_results.jls"), results)
+println("\nResults saved to $(joinpath(INTER_DIR, \"bvar_results.jls\"))")
