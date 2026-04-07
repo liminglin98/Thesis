@@ -33,6 +33,7 @@ include(joinpath(@__DIR__, "common.jl"))
 #   1: Real GDP YoY   2: IP YoY   3: CPI YoY   4: FR007
 #   5: M2 YoY         6: NEER YoY 7: US IP YoY
 const gdp_idx   = 1
+const ip_idx    = 2
 const cpi_idx   = 3
 const fr007_idx = 4
 const neer_idx  = 6
@@ -43,6 +44,7 @@ const irf_gdp_idx   = 1
 const irf_cpi_idx   = 2
 const irf_fr007_idx = 3
 const irf_neer_idx  = 4
+const irf_ip_idx    = 5
 
 # =============================================================================
 # 2) LOAD ACTUAL DATA (full sample, for overlay on all plots)
@@ -107,7 +109,7 @@ function build_first_diff_matrix(T_hor::Int)
 end
 
 function cnfctl_flexible(pi_base, y_base, i_base,
-                         Pi_m, Y_m, I_m, E_m,
+                         Pi_m, Y_m, I_m, E_m, IP_m, ip_base,
                          pi_target, y_target,
                          λ_pi, λ_y, λ_i, λ_e)
     T = length(pi_base)
@@ -128,6 +130,7 @@ function cnfctl_flexible(pi_base, y_base, i_base,
     y_cnfctl  = y_base  .+ Y_m  * nu_tilde
     i_cnfctl  = i_base  .+ I_m  * nu_tilde
     e_cnfctl  = E_m * nu_tilde
+    ip_cnfctl = ip_base .+ IP_m * nu_tilde
 
     L_pi = λ_pi * sum((pi_cnfctl .- pi_target).^2)
     L_y  = λ_y  * sum((y_cnfctl  .- y_target).^2)
@@ -135,7 +138,7 @@ function cnfctl_flexible(pi_base, y_base, i_base,
     L_e  = λ_e  * sum(e_cnfctl.^2)
 
     return (pi_cnfctl=pi_cnfctl, y_cnfctl=y_cnfctl, i_cnfctl=i_cnfctl,
-            e_cnfctl=e_cnfctl, nu_tilde=nu_tilde,
+            e_cnfctl=e_cnfctl, ip_cnfctl=ip_cnfctl, nu_tilde=nu_tilde,
             loss=Dict("total"=>L_pi+L_y+L_i+L_e, "pi"=>L_pi, "y"=>L_y, "i"=>L_i, "e"=>L_e))
 end
 
@@ -144,27 +147,31 @@ function nanquantile(X::Matrix{Float64}, q::Float64)
      for t in 1:size(X,1)]
 end
 
-function posterior_bands_flex(pi_base, y_base, i_base,
+function posterior_bands_flex(pi_base, y_base, i_base, ip_base,
                               narr_draws, hfi_draws, n_draws_irf, fcst_hor,
                               pi_target, y_target, λ_pi, λ_y, λ_i, λ_e)
     pi_d = zeros(fcst_hor, n_draws_irf)
     y_d  = zeros(fcst_hor, n_draws_irf)
     i_d  = zeros(fcst_hor, n_draws_irf)
     e_d  = zeros(fcst_hor, n_draws_irf)
+    ip_d = zeros(fcst_hor, n_draws_irf)
     nv = 0
     for d in 1:n_draws_irf
-        Pi_d = build_two_shock_map(narr_draws[d,:,irf_cpi_idx],   hfi_draws[d,:,irf_cpi_idx],   fcst_hor)
-        Y_d  = build_two_shock_map(narr_draws[d,:,irf_gdp_idx],   hfi_draws[d,:,irf_gdp_idx],   fcst_hor)
-        I_d  = build_two_shock_map(narr_draws[d,:,irf_fr007_idx], hfi_draws[d,:,irf_fr007_idx], fcst_hor)
-        E_d  = build_two_shock_map(narr_draws[d,:,irf_neer_idx],  hfi_draws[d,:,irf_neer_idx],  fcst_hor)
+        Pi_d  = build_two_shock_map(narr_draws[d,:,irf_cpi_idx],   hfi_draws[d,:,irf_cpi_idx],   fcst_hor)
+        Y_d   = build_two_shock_map(narr_draws[d,:,irf_gdp_idx],   hfi_draws[d,:,irf_gdp_idx],   fcst_hor)
+        I_d   = build_two_shock_map(narr_draws[d,:,irf_fr007_idx], hfi_draws[d,:,irf_fr007_idx], fcst_hor)
+        E_d   = build_two_shock_map(narr_draws[d,:,irf_neer_idx],  hfi_draws[d,:,irf_neer_idx],  fcst_hor)
+        IP_d  = build_two_shock_map(narr_draws[d,:,irf_ip_idx],    hfi_draws[d,:,irf_ip_idx],    fcst_hor)
         try
-            res = cnfctl_flexible(pi_base, y_base, i_base, Pi_d, Y_d, I_d, E_d,
+            res = cnfctl_flexible(pi_base, y_base, i_base, Pi_d, Y_d, I_d, E_d, IP_d, ip_base,
                                   pi_target, y_target, λ_pi, λ_y, λ_i, λ_e)
             pi_d[:,d] = res.pi_cnfctl; y_d[:,d] = res.y_cnfctl
             i_d[:,d]  = res.i_cnfctl;  e_d[:,d] = res.e_cnfctl
+            ip_d[:,d] = res.ip_cnfctl
             nv += 1
         catch
-            pi_d[:,d] .= NaN; y_d[:,d] .= NaN; i_d[:,d] .= NaN; e_d[:,d] .= NaN
+            pi_d[:,d] .= NaN; y_d[:,d] .= NaN; i_d[:,d] .= NaN
+            e_d[:,d]  .= NaN; ip_d[:,d] .= NaN
         end
     end
     println("  Valid draws: $nv / $n_draws_irf")
@@ -173,6 +180,7 @@ function posterior_bands_flex(pi_base, y_base, i_base,
         y_lb  = nanquantile(y_d,  0.16), y_ub  = nanquantile(y_d,  0.84),
         i_lb  = nanquantile(i_d,  0.16), i_ub  = nanquantile(i_d,  0.84),
         e_lb  = nanquantile(e_d,  0.16), e_ub  = nanquantile(e_d,  0.84),
+        ip_lb = nanquantile(ip_d, 0.16), ip_ub = nanquantile(ip_d, 0.84),
     )
 end
 
@@ -256,6 +264,7 @@ for yc in year_configs
     y_base  = baseline_fc[:, gdp_idx]
     i_base  = baseline_fc[:, fr007_idx]
     e_base  = baseline_fc[:, neer_idx]
+    ip_base = baseline_fc[:, ip_idx]
 
     pi_target = [cpi_target_for_year(year(d)) for d in cnfctl_dates]
     y_target  = [gdp_target_for_year(year(d)) for d in cnfctl_dates]
@@ -264,6 +273,7 @@ for yc in year_configs
     Y_m  = build_two_shock_map(narr_point[:, irf_gdp_idx],   hfi_point[:, irf_gdp_idx],   fcst_hor)
     I_m  = build_two_shock_map(narr_point[:, irf_fr007_idx], hfi_point[:, irf_fr007_idx], fcst_hor)
     E_m  = build_two_shock_map(narr_point[:, irf_neer_idx],  hfi_point[:, irf_neer_idx],  fcst_hor)
+    IP_m = build_two_shock_map(narr_point[:, irf_ip_idx],    hfi_point[:, irf_ip_idx],    fcst_hor)
 
     println("  Horizon: $fcst_hor months, maps: $(size(Pi_m))")
 
@@ -278,7 +288,7 @@ for yc in year_configs
         println("# $(rule.label)  |  cfctl $(cfctl_year) → sample $(yc.sample)")
         println("#"^60)
 
-        res = cnfctl_flexible(pi_base, y_base, i_base, Pi_m, Y_m, I_m, E_m,
+        res = cnfctl_flexible(pi_base, y_base, i_base, Pi_m, Y_m, I_m, E_m, IP_m, ip_base,
                               pi_target, y_target,
                               rule.λ_π, rule.λ_y, rule.λ_i, rule.λ_e)
 
@@ -290,7 +300,7 @@ for yc in year_configs
             mean(res.i_cnfctl), minimum(res.i_cnfctl), maximum(res.i_cnfctl)))
 
         println("  Computing posterior bands...")
-        bands = posterior_bands_flex(pi_base, y_base, i_base,
+        bands = posterior_bands_flex(pi_base, y_base, i_base, ip_base,
                     narr_draws, hfi_draws, n_draws_irf, fcst_hor,
                     pi_target, y_target,
                     rule.λ_π, rule.λ_y, rule.λ_i, rule.λ_e)
@@ -307,22 +317,23 @@ for yc in year_configs
         )
     end
 
-    # --- Build combined 3×4 figure (rows=rules, cols=CPI/GDP/FR007/NEER) ---
+    # --- Build combined 3×5 figure (rows=rules, cols=CPI/GDP/IP/FR007/NEER) ---
     blue  = RGB(0.45, 0.62, 0.70)
     lblue = RGB(0.45, 0.62, 0.70)
-    n_cols = 4
+    n_cols = 5
 
-    fig = plot(layout=(3, n_cols), size=(1800, 1000), margin=6Plots.mm,
+    fig = plot(layout=(3, n_cols), size=(2200, 1000), margin=6Plots.mm,
         plot_title="Counterfactual from $(cfctl_year) — sample $(yc.sample)")
 
     # Continuous actual data line: history + counterfactual window (no gap)
     all_plot_dates = vcat(hist_dates, actual_dates_window)
     all_plot_data  = vcat(hist_data, actual_data)
 
-    # Columns: CPI, GDP, FR007, NEER
+    # Columns: CPI, GDP, IP, FR007, NEER
     col_vars = [
         (idx=cpi_idx,   cnfctl=:pi_cnfctl, base=pi_base, e_adj=false, lb=:pi_lb, ub=:pi_ub, tgt=pi_target,  col_title="CPI YoY (%)"),
         (idx=gdp_idx,   cnfctl=:y_cnfctl,  base=y_base,  e_adj=false, lb=:y_lb,  ub=:y_ub,  tgt=y_target,   col_title="Real GDP YoY (%)"),
+        (idx=ip_idx,    cnfctl=:ip_cnfctl, base=ip_base, e_adj=false, lb=:ip_lb, ub=:ip_ub, tgt=nothing,    col_title="IP YoY (%)"),
         (idx=fr007_idx, cnfctl=:i_cnfctl,  base=i_base,  e_adj=false, lb=:i_lb,  ub=:i_ub,  tgt=nothing,    col_title="FR007 (%)"),
         (idx=neer_idx,  cnfctl=:e_cnfctl,  base=e_base,  e_adj=true,  lb=:e_lb,  ub=:e_ub,  tgt=nothing,    col_title="NEER YoY (%)"),
     ]
