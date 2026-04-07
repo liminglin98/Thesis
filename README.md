@@ -45,11 +45,11 @@ julia src/julia/run_all.jl
 │   ├── Data.ipynb
 │   └── Data_Monthly.ipynb
 │
-├── outputs/                    # All estimation outputs
-│   ├── intermediate/           # Serialized .jls data (BVAR results, IRF draws)
-│   ├── main_results/           # IRF plots & counterfactual figures
-│   ├── diagnostics/            # BVAR diagnostic plots (residuals, Wold decay, fit)
-│   └── robustness/             # Robustness checks (excl. 2020, alternative instruments)
+├── outputs/                    # All estimation outputs (by sample period)
+│   ├── intermediate/{2025,2019,2022}/  # Serialized .jls data
+│   ├── main_results/{2025,2019,2022}/  # IRF plots & counterfactual figures
+│   ├── diagnostics/{2025,2019,2022}/   # BVAR diagnostic plots
+│   └── robustness/{2025,2019,2022}/    # Robustness checks
 │
 ├── Literature Review/          # Literature notes
 ├── Lin_Research Proposal.tex   # Research proposal (LaTeX)
@@ -71,7 +71,13 @@ julia src/julia/run_all.jl
 
 ### Stage 2: Estimation & Analysis (Julia)
 
-`src/julia/run_all.jl` runs the following in order:
+`src/julia/run_all.jl` runs the following in order. Scripts 1-3 each loop over **3 sample periods**:
+
+| Sample | Period | Purpose |
+|--------|--------|---------|
+| `2025` | 2002-01 to 2025-12 | Baseline (full sample) |
+| `2019` | 2002-01 to 2019-12 | Pre-COVID |
+| `2022` | 2002-01 to 2022-12 | Pre-deflation |
 
 | Script | Description | Key Output |
 |--------|-------------|------------|
@@ -80,11 +86,15 @@ julia src/julia/run_all.jl
 | `HFIShocks.jl` | High-frequency identified shocks + IV-SVAR | `hfi_irf_ratechange.jls` |
 | `Counterfactual.jl` | Strict & flexible inflation targeting scenarios (Wolf et al. 2025) | `counterfactual_results.jls` |
 
+Sample periods are defined in `common.jl` (`SAMPLES` constant) and can be edited in one place.
+
 ### Output Categories
+
+Each category is organized by sample year (`2025/`, `2019/`, `2022/`):
 
 | Folder | Contents |
 |--------|----------|
-| `outputs/intermediate/` | Serialized `.jls` files — BVAR coefficients, IRF posterior draws, counterfactual results |
-| `outputs/main_results/` | IRF plots (narrative, HFI, comparison) and counterfactual scenario figures |
-| `outputs/diagnostics/` | BVAR residual plots, Wold coefficient decay, GDP in-sample fit & forecast |
-| `outputs/robustness/` | Policy rule comparison (full sample vs excl. 2020), alternative HFI instrument IRFs |
+| `outputs/intermediate/{year}/` | Serialized `.jls` files — BVAR coefficients, IRF posterior draws, counterfactual results |
+| `outputs/main_results/{year}/` | IRF plots (narrative, HFI, comparison) and counterfactual scenario figures |
+| `outputs/diagnostics/{year}/` | BVAR residual plots, Wold coefficient decay, GDP in-sample fit & forecast |
+| `outputs/robustness/{year}/` | Policy rule comparison (full sample vs excl. 2020), alternative HFI instrument IRFs |

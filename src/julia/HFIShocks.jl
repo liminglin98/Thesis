@@ -2,15 +2,13 @@
 using CSV, DataFrames, Statistics, GLM, StatsModels
 using Plots, Dates, ShiftedArrays
 using Printf, Random, Distributions, LinearAlgebra
+using Serialization
 ##
 include(joinpath(@__DIR__, "common.jl"))
-const MAIN_DIR   = main_results_dir()
-const ROBUST_DIR = robustness_dir()
-const INTER_DIR  = intermediate_dir()
 ##
-# Load data (monthly, already merged)
-df = CSV.read(joinpath(DERIVED_DIR, "hfi_core_data.csv"), DataFrame)
-df.date = Date.(df.date)
+# Load data once
+df_raw = CSV.read(joinpath(DERIVED_DIR, "hfi_core_data.csv"), DataFrame)
+df_raw.date = Date.(df_raw.date)
 
 var_syms   = [:realgdp_monthly_yoy, :cpi, :FR007, :neer_yoy, :IP_yoy]
 var_labels = ["Real GDP Growth", "CPI", "FR007", "Real Effective Exchange Rate", "Industrial Value Added"]
@@ -22,13 +20,9 @@ H          = 24   # IRF horizon
 gdp_col    = findfirst(==(:realgdp_monthly_yoy), var_syms)
 policy_col = findfirst(==(:FR007), var_syms)
 
-# Utility functions (get_lag_matrices, compute_ma, compute_irfs, iv_identify)
-# are loaded from common.jl
-
 ##
 # ============================================================
-# Main estimation function — instrument_sym is either
-#   :shock_policy  or  :shock_policy_change
+# Main estimation function
 # ============================================================
 
 function run_hfi_bvar(df::DataFrame, instrument_sym::Symbol;
@@ -39,8 +33,6 @@ function run_hfi_bvar(df::DataFrame, instrument_sym::Symbol;
     dates_bvar = df_bvar.date
 
     Y_full = Matrix{Float64}(df_bvar[:, var_syms])
-    # NaN in shock → 0 (no shock that month)
-    z_full = coalesce.(df_bvar[:, instrument_sym], 0.0)
     z_full = [ismissing(x) || isnan(x) ? 0.0 : Float64(x) for x in df_bvar[:, instrument_sym]]
     T_raw  = size(Y_full, 1)
 
@@ -59,26 +51,26 @@ function run_hfi_bvar(df::DataFrame, instrument_sym::Symbol;
     println("Sample: $(dates_est[1]) — $(dates_est[end])  |  T=$(Teff), n=$(n), p=$(p)")
     println("="^60)
 
-    # ── Minnesota prior ──────────────────────────────────────
+    # Minnesota prior
     B_ols      = X_var \ Y_dep
     U_ols      = Y_dep - X_var * B_ols
     sigma2_ols = vec(var(U_ols, dims=1))
 
     B0 = zeros(k, n)
     for j in 1:n
-        B0[1 + j, j] = 1.0   # own first lag = 1
+        B0[1 + j, j] = 1.0
     end
 
     Omega_diag = zeros(k, n)
     for j in 1:n
-        Omega_diag[1, j] = 100.0 * sigma2_ols[j]   # diffuse intercept
+        Omega_diag[1, j] = 100.0 * sigma2_ols[j]
         for L in 1:p, i in 1:n
             row = 1 + (L-1)*n + i
             Omega_diag[row, j] = (λ / L^d)^2 * (sigma2_ols[j] / sigma2_ols[i])
         end
     end
 
-    # ── Posterior (independent Normal-Wishart) ───────────────
+    # Posterior
     B_post = zeros(k, n)
     V_post = Vector{Matrix{Float64}}(undef, n)
     for j in 1:n
@@ -91,7 +83,7 @@ function run_hfi_bvar(df::DataFrame, instrument_sym::Symbol;
 
     U_post = Y_dep - X_var * B_post
 
-    # ── IV identification (point estimate) ───────────────────
+    # IV identification (point estimate)
     b_point, F_stat, _ = iv_identify(U_post, z, policy_col, gdp_col)
     isnothing(b_point) && error("IV identification failed on posterior mean")
 
@@ -102,7 +94,7 @@ function run_hfi_bvar(df::DataFrame, instrument_sym::Symbol;
     C_post = compute_ma(A_post, n, p, H)
     irf    = compute_irfs(C_post, b_point, H)
 
-    # ── Posterior draws ───────────────────────────────────────
+    # Posterior draws
     Random.seed!(42)
     irf_draws = zeros(n_draws, H + 1, n)
     n_valid   = Ref(0)
@@ -137,7 +129,7 @@ function run_hfi_bvar(df::DataFrame, instrument_sym::Symbol;
     irf_draws   = irf_draws[1:max(valid_draws, 1), :, :]
     println(@sprintf("Posterior draws: %d / %d valid", valid_draws, n_draws))
 
-    # ── Credible sets ─────────────────────────────────────────
+    # Credible sets
     irf_median = zeros(H + 1, n)
     irf_68_lo  = zeros(H + 1, n)
     irf_68_hi  = zeros(H + 1, n)
@@ -155,7 +147,7 @@ function run_hfi_bvar(df::DataFrame, instrument_sym::Symbol;
         end
     end
 
-    # ── IRF table ─────────────────────────────────────────────
+    # IRF table
     println("\n" * "="^60)
     println("IRFs — Contractionary MP Shock (+1 pp FR007)")
     println("Instrument: $(instrument_sym)")
@@ -176,20 +168,13 @@ function run_hfi_bvar(df::DataFrame, instrument_sym::Symbol;
     return (irf=irf, irf_median=irf_median,
             irf_68_lo=irf_68_lo, irf_68_hi=irf_68_hi,
             irf_90_lo=irf_90_lo, irf_90_hi=irf_90_hi,
+            irf_draws=irf_draws,
             F_stat=F_stat, valid_draws=valid_draws)
 end
 
 ##
 # ============================================================
-# Run both instruments
-# ============================================================
-
-res_policy        = run_hfi_bvar(df, :shock_policy;        label="(any announcement)")
-res_policy_change = run_hfi_bvar(df, :shock_policy_change; label="(rate change only)")
-
-##
-# ============================================================
-# Plot helpers
+# Plot helper
 # ============================================================
 
 function plot_irfs(res, title_suffix, color)
@@ -218,16 +203,34 @@ function plot_irfs(res, title_suffix, color)
 end
 
 ##
-fig1 = plot_irfs(res_policy,        "HFI: any policy announcement", :darkblue)
-fig2 = plot_irfs(res_policy_change, "HFI: rate change only",         :darkred)
+# ============================================================
+# Loop over sample periods
+# ============================================================
+
+for s in SAMPLES
+
+println("\n", "="^70)
+println("  HFIShocks — Sample: $(s.start_date) to $(s.end_date)  [$(s.label)]")
+println("="^70)
+
+MAIN_DIR   = main_results_dir(s.label)
+ROBUST_DIR = robustness_dir(s.label)
+INTER_DIR  = intermediate_dir(s.label)
+
+# Filter by date range
+df = filter(r -> !ismissing(r.date) && r.date >= s.start_date && r.date <= s.end_date, df_raw)
+
+# Run both instruments
+res_policy        = run_hfi_bvar(df, :shock_policy;        label="(any announcement) [$(s.label)]")
+res_policy_change = run_hfi_bvar(df, :shock_policy_change; label="(rate change only) [$(s.label)]")
+
+# Plots
+fig1 = plot_irfs(res_policy,        "HFI: any policy announcement ($(s.label))", :darkblue)
+fig2 = plot_irfs(res_policy_change, "HFI: rate change only ($(s.label))",         :darkred)
 savefig(fig1, joinpath(ROBUST_DIR, "irf_hfi_shock_policy.png"))
 savefig(fig2, joinpath(MAIN_DIR, "irf_hfi_shock_policy_change.png"))
 
-##
-# ============================================================
-# Overlay comparison panel
-# ============================================================
-
+# Overlay comparison
 p_compare = []
 for j in 1:n
     plt = plot(0:H, res_policy.irf_median[:, j],
@@ -249,27 +252,25 @@ n_cols = 3
 fig_compare = plot(p_compare...,
     layout=(ceil(Int, n/n_cols), n_cols),
     size=(380*n_cols, 300*ceil(Int, n/n_cols)),
-    plot_title="HFI Shock Comparison: Any Announcement vs Rate Change Only")
+    plot_title="HFI Shock Comparison ($(s.label))")
 display(fig_compare)
 savefig(fig_compare, joinpath(MAIN_DIR, "irf_hfi_comparison.png"))
 
-##
-# ============================================================
 # Diagnostics summary
-# ============================================================
-
 println("\n" * "="^60)
-println("Diagnostics Summary")
+println("Diagnostics Summary [$(s.label)]")
 println("="^60)
 println(@sprintf("%-30s  %10s  %10s", "Metric", "Any ann.", "Rate chg"))
 println(@sprintf("%-30s  %10.2f  %10.2f", "First-stage F-stat",
     res_policy.F_stat, res_policy_change.F_stat))
 println(@sprintf("%-30s  %10d  %10d", "Valid posterior draws",
     res_policy.valid_draws, res_policy_change.valid_draws))
-##
+
 # Save
-using Serialization
 serialize(joinpath(INTER_DIR, "hfi_irf_ratechange.jls"), Dict(
     "irf_point" => res_policy_change.irf,
-    "irf_draws" => irf_draws[1:res_policy_change.valid_draws, :, :],
+    "irf_draws" => res_policy_change.irf_draws,
     "H" => H))
+println("Results saved to $(joinpath(INTER_DIR, "hfi_irf_ratechange.jls"))")
+
+end  # for s in SAMPLES

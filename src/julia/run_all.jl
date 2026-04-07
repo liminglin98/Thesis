@@ -10,11 +10,16 @@
 #   3. HFIShocks.jl        — HFI shocks + BVAR+IV-SVAR
 #   4. Counterfactual.jl   — Counterfactual scenarios (depends on 1–3)
 #
-# Outputs are saved to:
-#   outputs/intermediate/   — serialized .jls data files
-#   outputs/main_results/   — IRF and counterfactual plots
-#   outputs/diagnostics/    — BVAR diagnostic plots
-#   outputs/robustness/     — robustness check plots
+# Each of scripts 1–3 loops over 3 sample periods:
+#   2025 (baseline):  2002-01 to 2025-12
+#   2019 (pre-COVID): 2002-01 to 2019-12
+#   2022 (pre-deflation): 2002-01 to 2022-12
+#
+# Outputs are saved to (with year subfolder per sample):
+#   outputs/intermediate/{2025,2019,2022}/  — serialized .jls data files
+#   outputs/main_results/{2025,2019,2022}/  — IRF and counterfactual plots
+#   outputs/diagnostics/{2025,2019,2022}/   — BVAR diagnostic plots
+#   outputs/robustness/{2025,2019,2022}/    — robustness check plots
 # =============================================================================
 
 using Dates, Printf
@@ -63,9 +68,9 @@ end
 println("  ", "-"^40)
 println(@sprintf("  %-30s  %8.1f", "Total", total_elapsed))
 println()
-println("  Output directories:")
-println("    intermediate/   — .jls data files")
-println("    main_results/   — IRF & counterfactual plots")
-println("    diagnostics/    — BVAR diagnostic plots")
-println("    robustness/     — robustness check plots")
+println("  Output directories (per sample: 2025, 2019, 2022):")
+println("    intermediate/{year}/   — .jls data files")
+println("    main_results/{year}/   — IRF & counterfactual plots")
+println("    diagnostics/{year}/    — BVAR diagnostic plots")
+println("    robustness/{year}/     — robustness check plots")
 println("="^70)

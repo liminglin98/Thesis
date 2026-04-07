@@ -2,11 +2,18 @@
 # Shared utility functions for BVAR/SVAR analysis
 # =============================================================================
 
-using LinearAlgebra
+using LinearAlgebra, Dates
 
 # --- Path configuration ---
 const PROJECT_ROOT = dirname(dirname(@__DIR__))
 const DERIVED_DIR  = joinpath(PROJECT_ROOT, "data", "derived")
+
+# --- Sample periods ---
+const SAMPLES = [
+    (start_date=Date(2002,1,1), end_date=Date(2025,12,1), label="2025"),
+    (start_date=Date(2002,1,1), end_date=Date(2019,12,1), label="2019"),
+    (start_date=Date(2002,1,1), end_date=Date(2022,12,1), label="2022"),
+]
 
 function output_dir(subfolder::String)
     d = joinpath(PROJECT_ROOT, "outputs", subfolder)
@@ -14,27 +21,27 @@ function output_dir(subfolder::String)
     return d
 end
 
-# --- Categorized output directories ---
-function intermediate_dir()
-    d = joinpath(PROJECT_ROOT, "outputs", "intermediate")
+# --- Categorized output directories (with sample subfolder) ---
+function intermediate_dir(sample::String)
+    d = joinpath(PROJECT_ROOT, "outputs", "intermediate", sample)
     mkpath(d)
     return d
 end
 
-function main_results_dir()
-    d = joinpath(PROJECT_ROOT, "outputs", "main_results")
+function main_results_dir(sample::String)
+    d = joinpath(PROJECT_ROOT, "outputs", "main_results", sample)
     mkpath(d)
     return d
 end
 
-function diagnostics_dir()
-    d = joinpath(PROJECT_ROOT, "outputs", "diagnostics")
+function diagnostics_dir(sample::String)
+    d = joinpath(PROJECT_ROOT, "outputs", "diagnostics", sample)
     mkpath(d)
     return d
 end
 
-function robustness_dir()
-    d = joinpath(PROJECT_ROOT, "outputs", "robustness")
+function robustness_dir(sample::String)
+    d = joinpath(PROJECT_ROOT, "outputs", "robustness", sample)
     mkpath(d)
     return d
 end

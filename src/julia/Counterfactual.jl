@@ -28,8 +28,8 @@
 using LinearAlgebra, Statistics, Printf, Dates, Serialization, Plots
 
 include(joinpath(@__DIR__, "common.jl"))
-const MAIN_DIR  = main_results_dir()
-const INTER_DIR = intermediate_dir()
+const MAIN_DIR  = main_results_dir("2025")
+const INTER_DIR = intermediate_dir("2025")
 
 # =============================================================================
 # 1) LOAD SAVED BVAR RESULTS (from LTP.jl)
