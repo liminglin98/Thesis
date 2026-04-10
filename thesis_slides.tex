@@ -1,0 +1,257 @@
+\documentclass[10pt,aspectratio=169]{beamer}
+
+% ─── Theme & colors ─────────────────────────────────────────────────────────
+\usetheme{metropolis}
+\usepackage{appendixnumberbeamer}
+\usepackage{booktabs}
+\usepackage{verbatim}
+\usepackage{amsmath, amssymb}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{CJKutf8}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, fit}
+
+\definecolor{spblue}{RGB}{0, 51, 102}
+\definecolor{spred}{RGB}{180, 30, 50}
+\definecolor{spgray}{RGB}{100, 100, 100}
+\setbeamercolor{frametitle}{bg=spblue}
+\setbeamercolor{progress bar}{fg=spred}
+\setbeamercolor{title separator}{fg=spred}
+
+% ─── Title page metadata ────────────────────────────────────────────────────
+\title{Rule-Based Monetary Policy in China}
+\subtitle{A Counterfactual Analysis Using the Wolf et al.\ (2025) Framework}
+\author{Liming Lin}
+\institute{Sciences Po Paris \\ \small Supervisor: Paul Bouscasse}
+\date{\today}
+
+\begin{document}
+
+% ─── Title slide ────────────────────────────────────────────────────────────
+\maketitle
+
+% ═══════════════════════════════════════════════════════════════════════════
+% SLIDE 1 — MOTIVATION & RESEARCH QUESTION
+% ═══════════════════════════════════════════════════════════════════════════
+\begin{frame}{Motivation}
+
+\textbf{The puzzle.} Since 2023, Chinese CPI inflation has hovered near zero,
+persistently undershooting the official targets set in the annual Government
+Work Report (GWR).
+
+\vspace{0.4em}
+\begin{itemize}
+  \item GWR CPI targets 2023--2025: \textbf{3\%, 3\%, 2\%}
+  \item Realized CPI YoY 2023--2025: roughly \textbf{0\%}
+  \item Xi's speech at the 2024 Central Economic Work Conference first
+        introduced the phrase ``a reasonable rebound in the price level''
+        (\begin{CJK}{UTF8}{gbsn}物价合理回升\end{CJK}); the 2025 CEWC
+        explicitly tied this objective to the conduct of monetary policy.
+\end{itemize}
+
+\vspace{0.6em}
+\textbf{The question.} What would have happened to the Chinese economy if
+the PBoC had strictly followed an inflation-targeting rule during this
+period?
+
+\vspace{0.6em}
+\textbf{Why it matters.}
+\begin{itemize}
+  \item Quantifies the policy gap: how far was actual policy from
+        target-consistent policy?
+  \item Tests whether conventional interest rate policy is even capable
+        of closing the inflation gap, given China's transmission mechanism.
+\end{itemize}
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════════════════
+% SLIDE 2 — METHODOLOGY ROADMAP
+% ═══════════════════════════════════════════════════════════════════════════
+\begin{frame}{Methodology Roadmap}
+
+Following Caravello, McKay \& Wolf (2025), the empirics-only counterfactual
+requires \textbf{four building blocks}:
+
+\vspace{0.6em}
+\begin{center}
+\begin{tikzpicture}[
+    node distance=0.7cm and 0.9cm,
+    box/.style={
+        rectangle, rounded corners=3pt, draw=spblue, thick,
+        fill=spblue!8, text width=3.0cm, align=center,
+        minimum height=1.4cm, font=\small
+    },
+    final/.style={
+        rectangle, rounded corners=3pt, draw=spred, very thick,
+        fill=spred!8, text width=3.4cm, align=center,
+        minimum height=1.4cm, font=\small
+    },
+    arr/.style={-{Stealth[length=2mm]}, thick, spgray}
+]
+
+\node[box] (rr) {\textbf{(1) Narrative shocks}\\ \scriptsize Chen et al. (2025) \\ Agrippino et al. (2026) policy rule residuals};
+\node[box, right=of rr] (hfi) {\textbf{(2) HFI shocks}\\ \scriptsize Daily FR007 surprises on policy event dates};
+\node[box, right=of hfi] (ltp) {\textbf{(3) Long Term Projections}\\ \scriptsize Reduced Form VAR estimated with 7-variable and Minnesota-prior};
+
+\node[final, below=1.0cm of hfi] (cf) {\textbf{(4) Counterfactual}\\ \scriptsize Loss-function optimization over the 2D shock space};
+
+\draw[arr] (rr.south) -- ++(0,-0.3) -| (cf.north west);
+\draw[arr] (hfi) -- (cf);
+\draw[arr] (ltp.south) -- ++(0,-0.3) -| (cf.north east);
+
+\end{tikzpicture}
+\end{center}
+\end{frame}
+% SLIDE 3 — METHODOLOGY ROADMAP EXPLANATION
+\begin{frame}{Methodology Roadmap Explanation}
+\vspace{0.4em}
+\begin{itemize}\itemsep0.2em
+  \item Blocks (1) and (2) provide \textbf{two distinct empirical IRFs} of the
+        Chinese economy to monetary policy shocks --- the policy ``treatments''
+        whose linear combinations span the feasible policy space.
+  \item Block (3) provides the \textbf{baseline projection} of where the
+        economy goes absent any policy intervention.
+  \item Block (4) solves for the shock sequence that moves the baseline
+        toward an inflation-targeting path, subject to a multi-objective
+        loss function.
+\end{itemize}
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════════════════
+% SLIDE 4 — NARRATIVE SHOCKS
+% ═══════════════════════════════════════════════════════════════════════════
+\begin{frame}{Narrative Shocks: Estimated Policy Rule}
+\hypertarget{slide:rr}{}
+ 
+\textbf{Specification.} A monthly policy rule for the 7-day interbank repo
+rate (FR007), combining elements from Chen, Ren \& Zha (2018) / Chen, Xiao
+\& Zha (2025) and Miranda-Agrippino, Nenova \& Rey (2026):
+ 
+\vspace{0.4em}
+{\small
+\begin{align*}
+\text{FR007}_t \;=\; \alpha
+&\;+\; \rho \cdot \text{FR007}_{t-1}
+\;+\; \beta_\pi \cdot \text{cpi\_gap}_{t-1} \\
+&\;+\; \beta_y^{+} \cdot \text{gap\_pos}_{t-1}
+\;+\; \beta_y^{-} \cdot \text{gap\_neg}_{t-1}
+\;+\; \beta_e \cdot \text{fx\_gap}_{t-1}
+\;+\; \varepsilon_t^{\text{MP}}
+\end{align*}
+}
+ 
+\vspace{0.2em}
+\textbf{Variable definitions.}
+\begin{itemize}\itemsep0.15em
+  \item[$\bullet$] $\text{cpi\_gap}_t = \pi_t - \pi^{*}_t$, where $\pi^*_t$ is
+        the annual CPI target from the Government Work Report
+  \item[$\bullet$] $\text{gdp\_gap}_t = g_t - g^{*}_t$, where $g_t$ is monthly real GDP YoY
+        \textcolor{spgray}{\scriptsize(see appendix:
+        \hyperlink{app:gdp}{\beamergotobutton{Stock--Watson construction}})}
+        and $g^*_t$ is the GWR growth target
+  \item[$\bullet$] $\text{gap\_pos}_t$, $\text{gap\_neg}_t$: asymmetric split of the
+        GDP gap around a 1pp threshold
+        \textcolor{spgray}{\scriptsize(see appendix:
+        \hyperlink{app:regime}{\beamergotobutton{regime-switch motivation}})}
+  \item[$\bullet$] $\text{fx\_gap}_t$: post-2006 interaction between the change
+        in the central parity rate and the spot--parity deviation
+\end{itemize}
+\end{frame}
+\begin{frame}{Narrative Shocks: Identification and Rationale}
+\hypertarget{slide:rr2}{}
+\textbf{Identification.} The residual $\widehat{\varepsilon}^{\text{MP}}_t$
+isolates the unsystematic component of FR007 movements --- the narrative
+monetary policy shock series.
+\textcolor{spgray}{\scriptsize\hyperlink{app:rrfit}{\beamergotobutton{actual vs.\ predicted FR007}}}
+ 
+\vspace{0.2em}
+\textbf{Why this hybrid specification?}
+\begin{itemize}\itemsep0.1em
+  \item[$\circ$] CRZ/Chen kept FR007 as the dependent variable but excluded the
+        exchange rate; MANR2026 added the FX interaction but used the CMPI
+        composite on the left-hand side.
+  \item[$\circ$] We retain FR007 (the actual market rate that anchors HFI surprises
+        downstream) while adopting MANR2026's FX specification.
+\end{itemize}
+ 
+\end{frame}
+ 
+% ═══════════════════════════════════════════════════════════════════════════
+% APPENDIX
+% ═══════════════════════════════════════════════════════════════════════════
+\appendix
+ 
+% --- Appendix slide: regime switch motivation -------------------------------
+\begin{frame}{Appendix --- Asymmetric GDP Gap Specification}
+\hypertarget{app:regime}{}
+ 
+\textbf{Construction.} Define the threshold indicator
+$\mathbb{1}_t^{-} = \mathbb{1}\{\text{gdp\_gap}_t < 1\}$, then split:
+\[
+\text{gap\_pos}_t = \text{gdp\_gap}_t \cdot (1 - \mathbb{1}_t^{-}),
+\qquad
+\text{gap\_neg}_t = \text{gdp\_gap}_t \cdot \mathbb{1}_t^{-}.
+\]
+ 
+\vspace{0.3em}
+\textbf{Motivation.} Following Chen, Ren \& Zha (2018), the PBoC's response
+to growth is hypothesised to be \emph{asymmetric}: monetary policy reacts
+more aggressively when realized GDP growth falls meaningfully below the
+official Government Work Report target than when it merely fluctuates around it.
+ 
+\vspace{0.4em}
+\textbf{Why a 1pp threshold rather than zero?}
+\begin{itemize}\itemsep0.15em
+  \item Chinese GWR growth targets are widely understood as floors rather than
+        point estimates --- modest overshoots are routine and politically uncontroversial.
+  \item A small undershoot ($0 \leq \text{gap} < 1$) is treated as a near-miss
+        and rarely triggers a policy response.
+  \item Only when the shortfall exceeds roughly one percentage point does the
+        PBoC enter a clearly accommodative regime.
+\end{itemize}
+ 
+\vspace{0.3em}
+\textbf{Empirical implication.} The coefficient $\beta_y^{-}$ on
+$\text{gap\_neg}$ should be larger in magnitude than $\beta_y^{+}$ on
+$\text{gap\_pos}$. MANR2026 Table B.1 confirms this pattern for the
+CMPI-based rule across all specifications.
+ 
+\hyperlink{slide:rr}{\beamerreturnbutton{back}}
+\end{frame}
+ 
+% --- Appendix slide: actual vs predicted FR007 + residuals ------------------
+\begin{frame}{Appendix --- Policy Rule Fit and Residuals}
+\hypertarget{app:rrfit}{}
+ 
+\textbf{Top.} Actual FR007 vs.\ predicted FR007 from the rule regression.
+\textbf{Bottom.} Estimated residual series $\widehat{\varepsilon}^{\text{MP}}_t$,
+used as the narrative monetary policy shock.
+ 
+\vspace{0.5em}
+% Placeholder images for FR007 fit and residuals
+% Top: Actual vs predicted FR007
+% Bottom: Residual series epsilon_t^MP
+
+\vspace{0.3em}
+\textcolor{spgray}{\scriptsize Robustness: regression re-estimated excluding
+2020 to verify that COVID-period observations do not unduly drive the
+coefficient estimates.}
+
+\hyperlink{slide:rr}{\beamerreturnbutton{back}}
+\end{frame}
+ 
+% --- Appendix slide: monthly GDP construction (placeholder, will fill later) -
+\begin{frame}{Appendix --- Monthly GDP Construction}
+\hypertarget{app:gdp}{}
+ 
+\textit{[To be filled in: Stock \& Watson (2010) distribution method,
+adapted to NBS quarterly GDP (\begin{CJK}{UTF8}{gbsn}当季值\end{CJK}) using
+the sum identity $Q_T = q_{3T-2} + q_{3T-1} + q_{3T}$, with monthly
+indicators consumption / FAI / government spending / trade balance.]}
+ 
+\hyperlink{slide:rr}{\beamerreturnbutton{back}}
+\end{frame}
+
+\end{document}
