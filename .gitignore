@@ -33,4 +33,4 @@ Literature Review/
 *.toc
 
 # No need for notebooks anymore
-*.ipynb
+notebooks/
