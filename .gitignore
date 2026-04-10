@@ -31,3 +31,6 @@ Literature Review/
 *.snm
 *.synctex.gz
 *.toc
+
+# No need for notebooks anymore
+*.ipynb
