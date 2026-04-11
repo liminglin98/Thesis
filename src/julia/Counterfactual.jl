@@ -127,15 +127,18 @@ function cnfctl_flexible(pi_base, y_base, i_base,
     gap_pi = pi_target .- pi_base
     gap_y  = y_target  .- y_base
 
-    D_anch   = build_first_diff_matrix_anchored(T)
-    DI       = D_anch * I_m
-    Di_base  = D_anch * i_base
-    d_anchor = zeros(T); d_anchor[1] = i_hist_last
+    # Anchored FR007 smoothing term:
+    # D_anch * i_cnfctl ≈ d_anchor, where
+    # d_anchor = [i_hist_last, 0, ..., 0]' enforces continuity at t=1 and smooth changes after.
+    D_anch = build_first_diff_matrix_anchored(T)
+    d_anchor = vcat([i_hist_last], zeros(T - 1))
+    gap_i = d_anchor .- D_anch * i_base
+    A_i = D_anch * I_m
 
     sq_pi = sqrt(λ_pi); sq_y = sqrt(λ_y); sq_i = sqrt(λ_i); sq_e = sqrt(λ_e)
 
-    A_stack = vcat(sq_pi * Pi_m, sq_y * Y_m, sq_i * DI, sq_e * E_m)
-    b_stack = vcat(sq_pi * gap_pi, sq_y * gap_y, sq_i * (d_anchor .- Di_base), sq_e * zeros(T))
+    A_stack = vcat(sq_pi * Pi_m, sq_y * Y_m, sq_i * A_i, sq_e * E_m)
+    b_stack = vcat(sq_pi * gap_pi, sq_y * gap_y, sq_i * gap_i, sq_e * zeros(T))
 
     nu_tilde  = A_stack \ b_stack
     pi_cnfctl = pi_base .+ Pi_m * nu_tilde
@@ -213,7 +216,7 @@ function cnfctl_flexible_evol(Y, A_list, c,
             y_target_t  = y_base_t  .+ y_gap_t
         end
 
-        i_hist_last_t = Y[start_idx_t - 1, fr007_idx]
+        i_hist_last_t = t_simul == 1 ? Y[start_idx_t - 1, fr007_idx] : i_base_t[1]
         res_t = cnfctl_flexible(pi_base_t, y_base_t, i_base_t,
                                 Pi_t, Y_t, I_t, E_t, IP_t, ip_base_t,
                                 pi_target_t, y_target_t, i_hist_last_t,
@@ -406,9 +409,9 @@ year_configs = [
 
 # Targeting rules (rows in each figure): all include FR007 impact-jump smoothing
 rules = [
-    (label="CPI Targeting",       λ_π=1.0, λ_y=0.0, λ_i=1.0, λ_e=0.0),
-    (label="CPI + GDP Targeting", λ_π=1.0, λ_y=0.5, λ_i=1.0, λ_e=0.0),
-    (label="CPI + GDP + NEER",    λ_π=1.0, λ_y=0.5, λ_i=1.0, λ_e=0.5),
+    (label="CPI Targeting",       λ_π=1.0, λ_y=0.0, λ_i=10.0, λ_e=0.0),
+    (label="CPI + GDP Targeting", λ_π=1.0, λ_y=0.5, λ_i=10.0, λ_e=0.0),
+    (label="CPI + GDP + NEER",    λ_π=1.0, λ_y=0.5, λ_i=10.0, λ_e=0.5),
 ]
 
 # =============================================================================
