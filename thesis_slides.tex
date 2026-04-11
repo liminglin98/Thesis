@@ -126,10 +126,10 @@ requires \textbf{four building blocks}:
 \hypertarget{slide:rr}{}
  
 \textbf{Specification.} A monthly policy rule for the 7-day interbank repo
-rate (FR007), combining elements from Chen, Ren \& Zha (2018) / Chen, Xiao
+rate (FR007), combining elements from Chen, Xiao
 \& Zha (2025) and Miranda-Agrippino, Nenova \& Rey (2026):
  
-\vspace{0.4em}
+
 {\small
 \begin{align*}
 \text{FR007}_t \;=\; \alpha
@@ -142,7 +142,7 @@ rate (FR007), combining elements from Chen, Ren \& Zha (2018) / Chen, Xiao
 \end{align*}
 }
  
-\vspace{0.2em}
+
 \textbf{Variable definitions.}
 \begin{itemize}\itemsep0.15em
   \item[$\bullet$] $\text{cpi\_gap}_t = \pi_t - \pi^{*}_t$, where $\pi^*_t$ is
@@ -177,7 +177,99 @@ monetary policy shock series.
 \end{itemize}
  
 \end{frame}
+
+% ═══════════════════════════════════════════════════════════════════════════
+% SLIDE 5 — HIGH-FREQUENCY SHOCKS
+% ═══════════════════════════════════════════════════════════════════════════
+\begin{frame}{High-Frequency Shocks: FR007 Surprises on Policy Event Dates}
+\hypertarget{slide:hfi}{}
+
+\textbf{Identification strategy.} Following Das \& Song (2022), we identify monetary policy surprises as the daily close-to-close change in the FR007 rate around dates on which the PBoC announces a change to one of its core policy instruments:
+
+\[
+\text{shock}_t \;=\; \bigl(\text{FR007}_t - \text{FR007}_{t-1}\bigr) \cdot \mathbb{1}\{t \in \mathcal{E}\}
+\]
+
+where $\mathcal{E}$ is the set of policy event dates.
+
+\vspace{0.4em}
+\textbf{Core policy instruments tracked.} Event dates are hand-collected from PBoC announcements (compiled in CMPI.xlsx, Miranda-Agrippino, Nenova \& Rey 2026):
+
+\begin{itemize}\itemsep0.15em
+  \item[$\bullet$] 7-day reverse repo rate (OMO) --- the primary short-term policy rate post-2016
+  \item[$\bullet$] 1-year Medium-term Lending Facility (MLF) --- introduced 2014, principal medium-term policy tool
+  \item[$\bullet$] 1-year Loan Prime Rate (LPR) --- replaced benchmark lending rate as the loan pricing anchor in August 2019
+  \item[$\bullet$] Reserve Requirement Ratio for large financial institutions (RRR)
+  \item[$\bullet$] Benchmark deposit and lending rates (pre-2015 era, before the rate liberalization)
+\end{itemize}
+
+\vspace{0.4em}
+\textbf{Two candidate shock series.}
+\begin{itemize}\itemsep0.15em
+  \item[$\bullet$] \textbf{\texttt{shock\_policy}}: $\Delta \text{FR007}$ on \emph{any} policy announcement day (rate change or not). Captures both rate decisions and forward-guidance content.
+  \item[$\bullet$] \textbf{\texttt{shock\_policy\_change}}: $\Delta \text{FR007}$ only on days when the announced instrument \emph{actually changed} its rate. Cleaner identification, smaller sample.
+\end{itemize}
+
+\vspace{0.2em}
+The rate-change-only series is the primary instrument; the any-announcement series serves as robustness.
+\textcolor{spgray}{\scriptsize\hyperlink{app:hfi_compare}{\beamergotobutton{IRF comparison: any vs.\ rate-change only}}}
+
+\vspace{0.4em}
+\textbf{Monthly aggregation.} Daily surprises are summed within each calendar month to produce the monthly HFI shock series, matching the BVAR's monthly frequency.
+
+\vspace{0.4em}
+\textbf{Caveat.} Das \& Song use 1-year IRS surprises rather than spot FR007 changes; we use spot FR007 due to limited Wind IRS data availability for the early sample, which we plan to revisit.
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════════════════
+% SLIDE 6 — REDUCED-FORM BVAR BASELINE (LTP)
+% ═══════════════════════════════════════════════════════════════════════════
+\begin{frame}{Reduced-Form Long-Term Projection: Bayesian VAR}
+
+	extbf{Specification.} A 7-variable monthly BVAR with $p=6$ lags, estimated with a Minnesota-type prior following Giannone, Lenza \& Primiceri (2015):
+\[
+y_t = c + \sum_{\ell=1}^{6} A_\ell\, y_{t-\ell} + \sum_{k=1}^{4} d_k\, D_t^{\text{covid},k} + u_t,
+\qquad
+u_t \sim \mathcal{N}(0,\Sigma_u)
+\]
+where $D_t^{\text{covid},k}$ are monthly dummies for Jan--Apr 2020.
+
+\vspace{0.3em}
+	extbf{Variables in $y_t$ (BVAR ordering, monthly).}
+{\small
+\[
+y_t = \bigl(g_t,\, \text{IP}_t,\, \pi_t,\, i_t,\, m_t,\, e_t,\, y_t^{US}\bigr)'
+\]
+$g_t$: real GDP YoY (Stock--Watson distribution from quarterly NBS GDP, \hyperlink{app:gdp}{\beamergotobutton{appendix}}); $\text{IP}_t$: industrial production YoY; $\pi_t$: CPI YoY; $i_t$: FR007; $m_t$: M2 YoY growth; $e_t$: RMB NEER YoY; $y_t^{US}$: US industrial production YoY.
+}
+
+\end{frame}
+\begin{frame}{Reduced-Form Long-Term Projection: Baseline and MA Representation}
+\vspace{0.3em}
+	extbf{Estimation samples.}
+\begin{itemize}\itemsep0.1em
+      \item Monthly estimation with COVID dummies included in all runs.
+      \item For each projection exercise, parameters are estimated through $t^*-1$.
+      \item Baseline vintages reported for 2019, 2022, and 2025.
+\end{itemize}
+
+
+\vspace{0.2em}
+	extbf{Baseline projection.}
+\[
+\hat{y}_{t^*+h} = \hat{c} + \sum_{\ell=1}^{6} \hat{A}_\ell\, \hat{y}_{t^*+h-\ell},
+\qquad h=1,2,\ldots,H
+\]
+	extbf{No data from the projection window enters the forecast.} For $\ell<h$, $\hat{y}_{t^*+h-\ell}$ is previously forecast; for $\ell\ge h$, it is pre-$t^*$ realized data.
+
+\vfill
+	extbf{Stored for counterfactual stage:} Wold MA form $y_t = c^* + \sum_{h=0}^{120} \Psi_h\, u_{t-h}$.
+
+\end{frame}
  
+
+
 % ═══════════════════════════════════════════════════════════════════════════
 % APPENDIX
 % ═══════════════════════════════════════════════════════════════════════════
@@ -252,6 +344,24 @@ the sum identity $Q_T = q_{3T-2} + q_{3T-1} + q_{3T}$, with monthly
 indicators consumption / FAI / government spending / trade balance.]}
  
 \hyperlink{slide:rr}{\beamerreturnbutton{back}}
+\end{frame}
+
+% --- Appendix slide: HFI comparison (any announcement vs. rate-change-only) --
+\begin{frame}{Appendix --- HFI Shocks: IRF Comparison}
+\hypertarget{app:hfi_compare}{}
+
+\textbf{Left.} IRF of Chinese economy to monetary policy shocks identified from FR007 surprises on \emph{any} PBoC policy announcement day.
+\textbf{Right.} IRF using \emph{rate-change-only} identification --- cleaner shock, smaller sample size.
+
+\vspace{0.5em}
+% Placeholder image for HFI IRF comparison
+% Left: any announcement shock IRF
+% Right: rate-change-only shock IRF
+
+\vspace{0.3em}
+\textcolor{spgray}{\scriptsize The rate-change-only series serves as the primary instrument in the counterfactual analysis, with the any-announcement series used for robustness checks.}
+
+\hyperlink{slide:hfi}{\beamerreturnbutton{back}}
 \end{frame}
 
 \end{document}

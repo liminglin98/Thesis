@@ -5,10 +5,10 @@
 #
 # Following Wolf et al. (2025) — loss function counterfactual
 #
-# Method: minimize weighted loss L with FR007 smoothing, solved in closed form.
-#   L = λ_π ‖π - π*‖² + λ_y ‖y - y*‖² + λ_i ‖Δi‖² + λ_e ‖E_m ν‖²
+# Method: minimize weighted loss L with FR007 impact-jump smoothing, solved in closed form.
+#   L = λ_π ‖π - π*‖² + λ_y ‖y - y*‖² + λ_i (i_1 - i_{hist,last})² + λ_e ‖E_m ν‖²
 #
-# Three targeting rules (all include FR007 smoothing):
+# Three targeting rules (all include FR007 impact-jump smoothing):
 #   1. CPI only:          λ_π=1, λ_y=0, λ_i=1, λ_e=0
 #   2. CPI + GDP:         λ_π=1, λ_y=0.5, λ_i=1, λ_e=0
 #   3. CPI + GDP + NEER:  λ_π=1, λ_y=0.5, λ_i=1, λ_e=0.5
@@ -108,22 +108,36 @@ function build_first_diff_matrix(T_hor::Int)
     return D
 end
 
+function build_first_diff_matrix_anchored(T_hor::Int)
+    # T x T lower-bidiagonal: first row anchors to last historical FR007.
+    D = zeros(T_hor, T_hor)
+    D[1, 1] = 1.0
+    for t in 2:T_hor
+        D[t, t-1] = -1.0
+        D[t, t]   = 1.0
+    end
+    return D
+end
+
 function cnfctl_flexible(pi_base, y_base, i_base,
                          Pi_m, Y_m, I_m, E_m, IP_m, ip_base,
-                         pi_target, y_target,
+                         pi_target, y_target, i_hist_last::Float64,
                          λ_pi, λ_y, λ_i, λ_e)
     T = length(pi_base)
     gap_pi = pi_target .- pi_base
     gap_y  = y_target  .- y_base
 
-    D       = build_first_diff_matrix(T)
-    DI      = D * I_m
-    Di_base = D * i_base
+    # Penalize only the first counterfactual jump relative to the last observed FR007.
+    B = zeros(1, T)
+    B[1, 1] = 1.0
+    BI       = B * I_m
+    Bi_base  = B * i_base
+    b_i      = [i_hist_last] .- Bi_base
 
     sq_pi = sqrt(λ_pi); sq_y = sqrt(λ_y); sq_i = sqrt(λ_i); sq_e = sqrt(λ_e)
 
-    A_stack = vcat(sq_pi * Pi_m, sq_y * Y_m, sq_i * DI, sq_e * E_m)
-    b_stack = vcat(sq_pi * gap_pi, sq_y * gap_y, sq_i * (-Di_base), sq_e * zeros(T))
+    A_stack = vcat(sq_pi * Pi_m, sq_y * Y_m, sq_i * BI, sq_e * E_m)
+    b_stack = vcat(sq_pi * gap_pi, sq_y * gap_y, sq_i * b_i, sq_e * zeros(T))
 
     nu_tilde  = A_stack \ b_stack
     pi_cnfctl = pi_base .+ Pi_m * nu_tilde
@@ -134,7 +148,7 @@ function cnfctl_flexible(pi_base, y_base, i_base,
 
     L_pi = λ_pi * sum((pi_cnfctl .- pi_target).^2)
     L_y  = λ_y  * sum((y_cnfctl  .- y_target).^2)
-    L_i  = λ_i  * sum((D * i_cnfctl).^2)
+    L_i  = λ_i  * (i_cnfctl[1] - i_hist_last)^2
     L_e  = λ_e  * sum(e_cnfctl.^2)
 
     return (pi_cnfctl=pi_cnfctl, y_cnfctl=y_cnfctl, i_cnfctl=i_cnfctl,
@@ -149,7 +163,8 @@ end
 
 function posterior_bands_flex(pi_base, y_base, i_base, ip_base,
                               narr_draws, hfi_draws, n_draws_irf, fcst_hor,
-                              pi_target, y_target, λ_pi, λ_y, λ_i, λ_e)
+                              pi_target, y_target, i_hist_last::Float64,
+                              λ_pi, λ_y, λ_i, λ_e)
     pi_d = zeros(fcst_hor, n_draws_irf)
     y_d  = zeros(fcst_hor, n_draws_irf)
     i_d  = zeros(fcst_hor, n_draws_irf)
@@ -164,7 +179,7 @@ function posterior_bands_flex(pi_base, y_base, i_base, ip_base,
         IP_d  = build_two_shock_map(narr_draws[d,:,irf_ip_idx],    hfi_draws[d,:,irf_ip_idx],    fcst_hor)
         try
             res = cnfctl_flexible(pi_base, y_base, i_base, Pi_d, Y_d, I_d, E_d, IP_d, ip_base,
-                                  pi_target, y_target, λ_pi, λ_y, λ_i, λ_e)
+                                  pi_target, y_target, i_hist_last, λ_pi, λ_y, λ_i, λ_e)
             pi_d[:,d] = res.pi_cnfctl; y_d[:,d] = res.y_cnfctl
             i_d[:,d]  = res.i_cnfctl;  e_d[:,d] = res.e_cnfctl
             ip_d[:,d] = res.ip_cnfctl
@@ -190,12 +205,11 @@ end
 
 # Year configurations: (counterfactual start, end, estimation sample label)
 year_configs = [
-    (cfctl_start=Date(2020,1,1), cfctl_end=Date(2025,12,1), sample="2019", n_hist=12),
     (cfctl_start=Date(2023,1,1), cfctl_end=Date(2025,12,1), sample="2022", n_hist=12),
     (cfctl_start=Date(2023,1,1), cfctl_end=Date(2025,12,1), sample="2025", n_hist=12),
 ]
 
-# Targeting rules (rows in each figure): all include FR007 smoothing
+# Targeting rules (rows in each figure): all include FR007 impact-jump smoothing
 rules = [
     (label="CPI Targeting",       λ_π=1.0, λ_y=0.0, λ_i=1.0, λ_e=0.0),
     (label="CPI + GDP Targeting", λ_π=1.0, λ_y=0.5, λ_i=1.0, λ_e=0.0),
@@ -259,6 +273,7 @@ for yc in year_configs
     hist_start_idx = max(1, fcst_date_idx - yc.n_hist)
     hist_dates = dates_actual[hist_start_idx:fcst_date_idx-1]
     hist_data  = Y_actual[hist_start_idx:fcst_date_idx-1, :]
+    i_hist_last = hist_data[end, fr007_idx]
 
     pi_base = baseline_fc[:, cpi_idx]
     y_base  = baseline_fc[:, gdp_idx]
@@ -289,10 +304,10 @@ for yc in year_configs
         println("#"^60)
 
         res = cnfctl_flexible(pi_base, y_base, i_base, Pi_m, Y_m, I_m, E_m, IP_m, ip_base,
-                              pi_target, y_target,
+                              pi_target, y_target, i_hist_last,
                               rule.λ_π, rule.λ_y, rule.λ_i, rule.λ_e)
 
-        println(@sprintf("  Loss: total=%.1f  π=%.1f  y=%.1f  Δi=%.1f  e=%.1f",
+        println(@sprintf("  Loss: total=%.1f  π=%.1f  y=%.1f  jump=%.1f  e=%.1f",
             res.loss["total"], res.loss["pi"], res.loss["y"], res.loss["i"], res.loss["e"]))
         println(@sprintf("  CPI:   mean=%.2f%%  range=[%.2f, %.2f]",
             mean(res.pi_cnfctl), minimum(res.pi_cnfctl), maximum(res.pi_cnfctl)))
@@ -302,7 +317,7 @@ for yc in year_configs
         println("  Computing posterior bands...")
         bands = posterior_bands_flex(pi_base, y_base, i_base, ip_base,
                     narr_draws, hfi_draws, n_draws_irf, fcst_hor,
-                    pi_target, y_target,
+                    pi_target, y_target, i_hist_last,
                     rule.λ_π, rule.λ_y, rule.λ_i, rule.λ_e)
 
         push!(rule_results, (res=res, bands=bands))
