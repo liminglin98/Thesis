@@ -5,10 +5,10 @@
 #
 # Following Wolf et al. (2025) — loss function counterfactual
 #
-# Method: minimize weighted loss L with FR007 impact-jump smoothing, solved in closed form.
-#   L = λ_π ‖π - π*‖² + λ_y ‖y - y*‖² + λ_i (i_1 - i_{hist,last})² + λ_e ‖E_m ν‖²
+# Method: minimize weighted loss L with anchored FR007 smoothing, solved in closed form.
+#   L = λ_π ‖π - π*‖² + λ_y ‖y - y*‖² + λ_i ‖D_anch i - d_anchor‖² + λ_e ‖E_m ν‖²
 #
-# Three targeting rules (all include FR007 impact-jump smoothing):
+# Three targeting rules (all include anchored FR007 smoothing):
 #   1. CPI only:          λ_π=1, λ_y=0, λ_i=1, λ_e=0
 #   2. CPI + GDP:         λ_π=1, λ_y=0.5, λ_i=1, λ_e=0
 #   3. CPI + GDP + NEER:  λ_π=1, λ_y=0.5, λ_i=1, λ_e=0.5
@@ -127,17 +127,15 @@ function cnfctl_flexible(pi_base, y_base, i_base,
     gap_pi = pi_target .- pi_base
     gap_y  = y_target  .- y_base
 
-    # Penalize only the first counterfactual jump relative to the last observed FR007.
-    B = zeros(1, T)
-    B[1, 1] = 1.0
-    BI       = B * I_m
-    Bi_base  = B * i_base
-    b_i      = [i_hist_last] .- Bi_base
+    D_anch   = build_first_diff_matrix_anchored(T)
+    DI       = D_anch * I_m
+    Di_base  = D_anch * i_base
+    d_anchor = zeros(T); d_anchor[1] = i_hist_last
 
     sq_pi = sqrt(λ_pi); sq_y = sqrt(λ_y); sq_i = sqrt(λ_i); sq_e = sqrt(λ_e)
 
-    A_stack = vcat(sq_pi * Pi_m, sq_y * Y_m, sq_i * BI, sq_e * E_m)
-    b_stack = vcat(sq_pi * gap_pi, sq_y * gap_y, sq_i * b_i, sq_e * zeros(T))
+    A_stack = vcat(sq_pi * Pi_m, sq_y * Y_m, sq_i * DI, sq_e * E_m)
+    b_stack = vcat(sq_pi * gap_pi, sq_y * gap_y, sq_i * (d_anchor .- Di_base), sq_e * zeros(T))
 
     nu_tilde  = A_stack \ b_stack
     pi_cnfctl = pi_base .+ Pi_m * nu_tilde
@@ -148,12 +146,168 @@ function cnfctl_flexible(pi_base, y_base, i_base,
 
     L_pi = λ_pi * sum((pi_cnfctl .- pi_target).^2)
     L_y  = λ_y  * sum((y_cnfctl  .- y_target).^2)
-    L_i  = λ_i  * (i_cnfctl[1] - i_hist_last)^2
+    L_i  = λ_i  * sum((D_anch * i_cnfctl .- d_anchor).^2)
     L_e  = λ_e  * sum(e_cnfctl.^2)
 
     return (pi_cnfctl=pi_cnfctl, y_cnfctl=y_cnfctl, i_cnfctl=i_cnfctl,
             e_cnfctl=e_cnfctl, ip_cnfctl=ip_cnfctl, nu_tilde=nu_tilde,
             loss=Dict("total"=>L_pi+L_y+L_i+L_e, "pi"=>L_pi, "y"=>L_y, "i"=>L_i, "e"=>L_e))
+end
+
+function shift_left_with_zero(v::Vector{Float64})
+    T = length(v)
+    T == 1 && return [0.0]
+    return vcat(v[2:end], 0.0)
+end
+
+function cnfctl_flexible_evol(Y, A_list, c,
+                              narr_point, hfi_point,
+                              fcst_date_idx::Int, fcst_hor::Int,
+                              pi_target::Vector{Float64}, y_target::Vector{Float64},
+                              λ_pi, λ_y, λ_i, λ_e)
+    pi_cf = zeros(fcst_hor)
+    y_cf  = zeros(fcst_hor)
+    i_cf  = zeros(fcst_hor)
+    e_cf  = zeros(fcst_hor)
+    ip_cf = zeros(fcst_hor)
+
+    pi_base_roll = zeros(fcst_hor)
+    y_base_roll  = zeros(fcst_hor)
+    i_base_roll  = zeros(fcst_hor)
+    e_base_roll  = zeros(fcst_hor)
+    ip_base_roll = zeros(fcst_hor)
+
+    L_pi = 0.0; L_y = 0.0; L_i = 0.0; L_e = 0.0
+
+    prev_pi_base = Float64[]
+    prev_y_base  = Float64[]
+
+    max_roll = min(fcst_hor, size(Y, 1) - fcst_date_idx + 1)
+    last_res = nothing
+    last_base = nothing
+
+    for t_simul in 1:max_roll
+        start_idx_t = fcst_date_idx + t_simul - 1
+        H_t = fcst_hor - t_simul + 1
+
+        baseline_t = forecast_from_date(Y, A_list, c, start_idx_t - 1, H_t)
+        pi_base_t = baseline_t[:, cpi_idx]
+        y_base_t  = baseline_t[:, gdp_idx]
+        i_base_t  = baseline_t[:, fr007_idx]
+        e_base_t  = baseline_t[:, neer_idx]
+        ip_base_t = baseline_t[:, ip_idx]
+
+        Pi_t = build_two_shock_map(narr_point[:, irf_cpi_idx],   hfi_point[:, irf_cpi_idx],   H_t)
+        Y_t  = build_two_shock_map(narr_point[:, irf_gdp_idx],   hfi_point[:, irf_gdp_idx],   H_t)
+        I_t  = build_two_shock_map(narr_point[:, irf_fr007_idx], hfi_point[:, irf_fr007_idx], H_t)
+        E_t  = build_two_shock_map(narr_point[:, irf_neer_idx],  hfi_point[:, irf_neer_idx],  H_t)
+        IP_t = build_two_shock_map(narr_point[:, irf_ip_idx],    hfi_point[:, irf_ip_idx],    H_t)
+
+        pi_target_t = pi_target[t_simul:end]
+        y_target_t  = y_target[t_simul:end]
+        if t_simul > 1
+            # Forecast-revision gap: current baseline minus last-step baseline shifted by one month.
+            pi_gap_t = pi_base_t .- prev_pi_base[2:end]
+            y_gap_t  = y_base_t  .- prev_y_base[2:end]
+            pi_target_t = pi_base_t .+ pi_gap_t
+            y_target_t  = y_base_t  .+ y_gap_t
+        end
+
+        i_hist_last_t = Y[start_idx_t - 1, fr007_idx]
+        res_t = cnfctl_flexible(pi_base_t, y_base_t, i_base_t,
+                                Pi_t, Y_t, I_t, E_t, IP_t, ip_base_t,
+                                pi_target_t, y_target_t, i_hist_last_t,
+                                λ_pi, λ_y, λ_i, λ_e)
+        last_res = res_t
+        last_base = (pi=pi_base_t, y=y_base_t, i=i_base_t, e=e_base_t, ip=ip_base_t)
+
+        pi_cf[t_simul] = res_t.pi_cnfctl[1]
+        y_cf[t_simul]  = res_t.y_cnfctl[1]
+        i_cf[t_simul]  = res_t.i_cnfctl[1]
+        e_cf[t_simul]  = res_t.e_cnfctl[1]
+        ip_cf[t_simul] = res_t.ip_cnfctl[1]
+
+        pi_base_roll[t_simul] = pi_base_t[1]
+        y_base_roll[t_simul]  = y_base_t[1]
+        i_base_roll[t_simul]  = i_base_t[1]
+        e_base_roll[t_simul]  = e_base_t[1]
+        ip_base_roll[t_simul] = ip_base_t[1]
+
+        L_pi += res_t.loss["pi"]
+        L_y  += res_t.loss["y"]
+        L_i  += res_t.loss["i"]
+        L_e  += res_t.loss["e"]
+
+        prev_pi_base = pi_base_t
+        prev_y_base  = y_base_t
+    end
+
+    if max_roll < fcst_hor && last_res !== nothing
+        rem = fcst_hor - max_roll
+        pi_cf[max_roll+1:end] = last_res.pi_cnfctl[2:rem+1]
+        y_cf[max_roll+1:end]  = last_res.y_cnfctl[2:rem+1]
+        i_cf[max_roll+1:end]  = last_res.i_cnfctl[2:rem+1]
+        e_cf[max_roll+1:end]  = last_res.e_cnfctl[2:rem+1]
+        ip_cf[max_roll+1:end] = last_res.ip_cnfctl[2:rem+1]
+
+        pi_base_roll[max_roll+1:end] = last_base.pi[2:rem+1]
+        y_base_roll[max_roll+1:end]  = last_base.y[2:rem+1]
+        i_base_roll[max_roll+1:end]  = last_base.i[2:rem+1]
+        e_base_roll[max_roll+1:end]  = last_base.e[2:rem+1]
+        ip_base_roll[max_roll+1:end] = last_base.ip[2:rem+1]
+    end
+
+    return (
+        pi_cnfctl=pi_cf, y_cnfctl=y_cf, i_cnfctl=i_cf, e_cnfctl=e_cf, ip_cnfctl=ip_cf,
+        pi_base_roll=pi_base_roll, y_base_roll=y_base_roll, i_base_roll=i_base_roll,
+        e_base_roll=e_base_roll, ip_base_roll=ip_base_roll,
+        loss=Dict("total"=>L_pi+L_y+L_i+L_e, "pi"=>L_pi, "y"=>L_y, "i"=>L_i, "e"=>L_e),
+    )
+end
+
+function rule_slug(lbl::String)
+    s = lowercase(lbl)
+    s = replace(s, "+" => "plus")
+    s = replace(s, r"[^a-z0-9]+" => "_")
+    s = replace(s, r"_+" => "_")
+    return strip(s, '_')
+end
+
+function save_rule_figure(method::String, sample::String, rule_label::String,
+                          hist_dates, hist_data, actual_dates_window, actual_data,
+                          cnfctl_dates, pi_target, y_target,
+                          pi_base, y_base, i_base, e_base, ip_base,
+                          pi_cf, y_cf, i_cf, e_cf, ip_cf,
+                          out_dir)
+    blue  = RGB(0.45, 0.62, 0.70)
+    fig = plot(layout=(1, 5), size=(2200, 420), margin=5Plots.mm,
+        plot_title="$(uppercase(method)) | $(rule_label) | sample $(sample)")
+
+    all_plot_dates = vcat(hist_dates, actual_dates_window)
+    all_plot_data  = vcat(hist_data, actual_data)
+
+    col_vars = [
+        (idx=cpi_idx,  base=pi_base, cf=pi_cf, tgt=pi_target, ctitle="CPI YoY (%)"),
+        (idx=gdp_idx,  base=y_base,  cf=y_cf,  tgt=y_target,  ctitle="Real GDP YoY (%)"),
+        (idx=ip_idx,   base=ip_base, cf=ip_cf, tgt=nothing,   ctitle="IP YoY (%)"),
+        (idx=fr007_idx,base=i_base,  cf=i_cf,  tgt=nothing,   ctitle="FR007 (%)"),
+        (idx=neer_idx, base=e_base,  cf=(e_base .+ e_cf), tgt=nothing, ctitle="NEER YoY (%)"),
+    ]
+
+    for (sp, cv) in enumerate(col_vars)
+        plot!(fig[sp], all_plot_dates, all_plot_data[:, cv.idx], color=:black, lw=2, label=(sp==1 ? "Data" : ""))
+        plot!(fig[sp], cnfctl_dates, cv.base, color=:gray, lw=1.5, ls=:dash, label=(sp==1 ? "Forecast" : ""))
+        if cv.tgt !== nothing
+            plot!(fig[sp], cnfctl_dates, cv.tgt, color=:red, lw=1.5, ls=:dot, label=(sp==1 ? "Target" : ""))
+        end
+        plot!(fig[sp], cnfctl_dates, cv.cf, color=blue, lw=2.5, label=(sp==1 ? "Counterfact'l" : ""))
+        hline!(fig[sp], [0], color=:gray, ls=:dot, alpha=0.3, label="")
+        title!(fig[sp], cv.ctitle)
+    end
+
+    fpath = joinpath(out_dir, "cnfctl_$(method)_$(rule_slug(rule_label))_s$(sample).png")
+    savefig(fig, fpath)
+    return fpath
 end
 
 function nanquantile(X::Matrix{Float64}, q::Float64)
@@ -190,6 +344,47 @@ function posterior_bands_flex(pi_base, y_base, i_base, ip_base,
         end
     end
     println("  Valid draws: $nv / $n_draws_irf")
+    return (;
+        pi_lb = nanquantile(pi_d, 0.16), pi_ub = nanquantile(pi_d, 0.84),
+        y_lb  = nanquantile(y_d,  0.16), y_ub  = nanquantile(y_d,  0.84),
+        i_lb  = nanquantile(i_d,  0.16), i_ub  = nanquantile(i_d,  0.84),
+        e_lb  = nanquantile(e_d,  0.16), e_ub  = nanquantile(e_d,  0.84),
+        ip_lb = nanquantile(ip_d, 0.16), ip_ub = nanquantile(ip_d, 0.84),
+    )
+end
+
+function posterior_bands_flex_evol(Y, A_list, c,
+                                   narr_draws, hfi_draws, n_draws_irf,
+                                   fcst_date_idx::Int, fcst_hor::Int,
+                                   pi_target, y_target,
+                                   λ_pi, λ_y, λ_i, λ_e)
+    pi_d = zeros(fcst_hor, n_draws_irf)
+    y_d  = zeros(fcst_hor, n_draws_irf)
+    i_d  = zeros(fcst_hor, n_draws_irf)
+    e_d  = zeros(fcst_hor, n_draws_irf)
+    ip_d = zeros(fcst_hor, n_draws_irf)
+    nv = 0
+    for d in 1:n_draws_irf
+        narr_point_d = Matrix(narr_draws[d, :, :])
+        hfi_point_d  = Matrix(hfi_draws[d, :, :])
+        try
+            res = cnfctl_flexible_evol(Y, A_list, c,
+                                       narr_point_d, hfi_point_d,
+                                       fcst_date_idx, fcst_hor,
+                                       pi_target, y_target,
+                                       λ_pi, λ_y, λ_i, λ_e)
+            pi_d[:,d] = res.pi_cnfctl
+            y_d[:,d]  = res.y_cnfctl
+            i_d[:,d]  = res.i_cnfctl
+            e_d[:,d]  = res.e_cnfctl
+            ip_d[:,d] = res.ip_cnfctl
+            nv += 1
+        catch
+            pi_d[:,d] .= NaN; y_d[:,d] .= NaN; i_d[:,d] .= NaN
+            e_d[:,d]  .= NaN; ip_d[:,d] .= NaN
+        end
+    end
+    println("  Valid evol draws: $nv / $n_draws_irf")
     return (;
         pi_lb = nanquantile(pi_d, 0.16), pi_ub = nanquantile(pi_d, 0.84),
         y_lb  = nanquantile(y_d,  0.16), y_ub  = nanquantile(y_d,  0.84),
@@ -280,7 +475,7 @@ for yc in year_configs
     i_base  = baseline_fc[:, fr007_idx]
     e_base  = baseline_fc[:, neer_idx]
     ip_base = baseline_fc[:, ip_idx]
-
+    println("  i_hist_last = $(i_hist_last),  i_base[1] = $(i_base[1]),  gap = $(i_base[1] - i_hist_last)")
     pi_target = [cpi_target_for_year(year(d)) for d in cnfctl_dates]
     y_target  = [gdp_target_for_year(year(d)) for d in cnfctl_dates]
 
@@ -292,15 +487,16 @@ for yc in year_configs
 
     println("  Horizon: $fcst_hor months, maps: $(size(Pi_m))")
 
-    # --- Solve all 3 rules, collect results ---
+    # --- Solve all 3 rules, collect scenario/evol results ---
     cfctl_year = string(year(yc.cfctl_start))
-    rule_results = []  # Vector of (res, bands) tuples
+    rule_results = []  # Vector of (rule, scenario_res, scenario_bands, evol_res, evol_bands)
 
     for rule in rules
-        key = "$(yc.sample)_$(cfctl_year)_$(rule.label)"
+        key_scenario = "scenario_$(yc.sample)_$(cfctl_year)_$(rule.label)"
+        key_evol = "evol_$(yc.sample)_$(cfctl_year)_$(rule.label)"
 
         println("\n", "#"^60)
-        println("# $(rule.label)  |  cfctl $(cfctl_year) → sample $(yc.sample)")
+        println("# $(rule.label)  |  cfctl $(cfctl_year) → sample $(yc.sample) [scenario]")
         println("#"^60)
 
         res = cnfctl_flexible(pi_base, y_base, i_base, Pi_m, Y_m, I_m, E_m, IP_m, ip_base,
@@ -320,16 +516,52 @@ for yc in year_configs
                     pi_target, y_target, i_hist_last,
                     rule.λ_π, rule.λ_y, rule.λ_i, rule.λ_e)
 
-        push!(rule_results, (res=res, bands=bands))
+        println("\n", "#"^60)
+        println("# $(rule.label)  |  cfctl $(cfctl_year) → sample $(yc.sample) [evol]")
+        println("#"^60)
+        evol_res = cnfctl_flexible_evol(Y_actual, A_list, c_vec,
+                        narr_point, hfi_point,
+                        fcst_date_idx, fcst_hor,
+                        pi_target, y_target,
+                        rule.λ_π, rule.λ_y, rule.λ_i, rule.λ_e)
 
-        all_results[key] = Dict(
+        println(@sprintf("  Loss: total=%.1f  π=%.1f  y=%.1f  jump=%.1f  e=%.1f",
+            evol_res.loss["total"], evol_res.loss["pi"], evol_res.loss["y"], evol_res.loss["i"], evol_res.loss["e"]))
+        println(@sprintf("  CPI:   mean=%.2f%%  range=[%.2f, %.2f]",
+            mean(evol_res.pi_cnfctl), minimum(evol_res.pi_cnfctl), maximum(evol_res.pi_cnfctl)))
+        println(@sprintf("  FR007: mean=%.2f%%  range=[%.2f, %.2f]",
+            mean(evol_res.i_cnfctl), minimum(evol_res.i_cnfctl), maximum(evol_res.i_cnfctl)))
+
+        n_draws_evol_bands = min(n_draws_irf, 300)
+        println("  Computing evol posterior bands... (draws=$(n_draws_evol_bands))")
+        evol_bands = posterior_bands_flex_evol(Y_actual, A_list, c_vec,
+                narr_draws, hfi_draws, n_draws_evol_bands,
+                        fcst_date_idx, fcst_hor,
+                        pi_target, y_target,
+                        rule.λ_π, rule.λ_y, rule.λ_i, rule.λ_e)
+
+        push!(rule_results, (rule=rule, scenario_res=res, scenario_bands=bands, evol_res=evol_res, evol_bands=evol_bands))
+
+        all_results[key_scenario] = Dict(
             "cfctl_start" => yc.cfctl_start, "sample" => yc.sample,
+            "variant" => "scenario",
             "rule" => rule.label, "lambdas" => (rule.λ_π, rule.λ_y, rule.λ_i, rule.λ_e),
             "cnfctl_dates" => cnfctl_dates,
             "res" => res, "bands" => bands,
             "baseline_fc" => baseline_fc,
             "pi_target" => pi_target, "y_target" => y_target,
         )
+
+        all_results[key_evol] = Dict(
+            "cfctl_start" => yc.cfctl_start, "sample" => yc.sample,
+            "variant" => "evol",
+            "rule" => rule.label, "lambdas" => (rule.λ_π, rule.λ_y, rule.λ_i, rule.λ_e),
+            "cnfctl_dates" => cnfctl_dates,
+            "res" => evol_res, "bands" => evol_bands,
+            "baseline_fc" => baseline_fc,
+            "pi_target" => pi_target, "y_target" => y_target,
+        )
+
     end
 
     # --- Build combined 3×5 figure (rows=rules, cols=CPI/GDP/IP/FR007/NEER) ---
@@ -353,7 +585,8 @@ for yc in year_configs
         (idx=neer_idx,  cnfctl=:e_cnfctl,  base=e_base,  e_adj=true,  lb=:e_lb,  ub=:e_ub,  tgt=nothing,    col_title="NEER YoY (%)"),
     ]
 
-    for (r, (rule, rr)) in enumerate(zip(rules, rule_results))
+    for (r, rr) in enumerate(rule_results)
+        rule = rr.rule
         for (c, cv) in enumerate(col_vars)
             sp = (r - 1) * n_cols + c
 
@@ -372,8 +605,8 @@ for yc in year_configs
             end
 
             # 68% posterior bands
-            bd_lb = getfield(rr.bands, cv.lb)
-            bd_ub = getfield(rr.bands, cv.ub)
+            bd_lb = getfield(rr.scenario_bands, cv.lb)
+            bd_ub = getfield(rr.scenario_bands, cv.ub)
             # For NEER, bands are deviations from baseline — add e_base
             if cv.e_adj
                 bd_lb = cv.base .+ bd_lb
@@ -384,7 +617,7 @@ for yc in year_configs
                 label=(r==1 && c==1 ? "68%" : ""))
 
             # Counterfactual path
-            cnfctl_path = getfield(rr.res, cv.cnfctl)
+            cnfctl_path = getfield(rr.scenario_res, cv.cnfctl)
             if cv.e_adj
                 cnfctl_path = cv.base .+ cnfctl_path
             end
@@ -418,9 +651,93 @@ for yc in year_configs
     end
 
     display(fig)
-    fname = "cnfctl_$(cfctl_year)_s$(yc.sample).png"
-    savefig(fig, joinpath(MAIN_DIR, fname))
-    println("\n  Saved: $fname")
+    fname_scenario = "cnfctl_scenario_$(cfctl_year)_s$(yc.sample).png"
+    savefig(fig, joinpath(MAIN_DIR, fname_scenario))
+    println("\n  Saved: $fname_scenario")
+
+    # --- Build combined 3x5 figure for evol (rows=rules, cols=CPI/GDP/IP/FR007/NEER) ---
+    fig_evol = plot(layout=(3, n_cols), size=(2200, 1000), margin=6Plots.mm,
+        plot_title="Counterfactual EVOL from $(cfctl_year) — sample $(yc.sample)")
+
+    for (r, rr) in enumerate(rule_results)
+        rule = rr.rule
+        for (c, cv) in enumerate(col_vars)
+            sp = (r - 1) * n_cols + c
+
+            # Actual data — one continuous line
+            plot!(fig_evol[sp], all_plot_dates, all_plot_data[:, cv.idx],
+                color=:black, lw=2, label=(r==1 && c==1 ? "Data" : ""))
+
+            # Evol rolling baseline forecast
+            if cv.idx == cpi_idx
+                base_evol = rr.evol_res.pi_base_roll
+            elseif cv.idx == gdp_idx
+                base_evol = rr.evol_res.y_base_roll
+            elseif cv.idx == ip_idx
+                base_evol = rr.evol_res.ip_base_roll
+            elseif cv.idx == fr007_idx
+                base_evol = rr.evol_res.i_base_roll
+            else
+                base_evol = rr.evol_res.e_base_roll
+            end
+            plot!(fig_evol[sp], cnfctl_dates, base_evol,
+                color=:gray, lw=1.5, ls=:dash, label=(r==1 && c==1 ? "Forecast" : ""))
+
+            # Target line (CPI and GDP only)
+            if cv.tgt !== nothing
+                plot!(fig_evol[sp], cnfctl_dates, cv.tgt,
+                    color=:red, lw=1.5, ls=:dot, label=(r==1 && c==1 ? "Target" : ""))
+            end
+
+            # 68% posterior bands for evol
+            bd_lb = getfield(rr.evol_bands, cv.lb)
+            bd_ub = getfield(rr.evol_bands, cv.ub)
+            if cv.e_adj
+                bd_lb = base_evol .+ bd_lb
+                bd_ub = base_evol .+ bd_ub
+            end
+            plot!(fig_evol[sp], cnfctl_dates, bd_lb,
+                fillrange=bd_ub, fillalpha=0.2, fillcolor=lblue, lw=0,
+                label=(r==1 && c==1 ? "68%" : ""))
+
+            # Evol counterfactual path
+            cnfctl_path = getfield(rr.evol_res, cv.cnfctl)
+            if cv.e_adj
+                cnfctl_path = base_evol .+ cnfctl_path
+            end
+            plot!(fig_evol[sp], cnfctl_dates, cnfctl_path,
+                color=blue, lw=2.5, label=(r==1 && c==1 ? "Counterfact'l" : ""))
+
+            hline!(fig_evol[sp], [0], color=:gray, ls=:dot, alpha=0.3, label="")
+
+            # Set y-axis limits: use actual data range + counterfactual range, with padding
+            all_vals = vcat(
+                all_plot_data[:, cv.idx],
+                cnfctl_path,
+                base_evol,
+                bd_lb, bd_ub,
+            )
+            all_vals = filter(!isnan, all_vals)
+            if !isempty(all_vals)
+                ylo, yhi = minimum(all_vals), maximum(all_vals)
+                pad = 0.15 * max(yhi - ylo, 1.0)
+                ylims!(fig_evol[sp], (ylo - pad, yhi + pad))
+            end
+
+            # Title on row 1 only; ylabel on column 1 only
+            if r == 1
+                title!(fig_evol[sp], cv.col_title)
+            end
+            if c == 1
+                ylabel!(fig_evol[sp], rule.label)
+            end
+        end
+    end
+
+    display(fig_evol)
+    fname_evol = "cnfctl_evol_$(cfctl_year)_s$(yc.sample).png"
+    savefig(fig_evol, joinpath(MAIN_DIR, fname_evol))
+    println("  Saved: $fname_evol")
 end
 
 # =============================================================================
