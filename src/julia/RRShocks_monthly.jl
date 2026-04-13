@@ -70,64 +70,26 @@ println("\n=== Model (full sample $(s.label)) ===")
 println(model1)
 
 # =========================
-# 2) Robustness: excl-2020 comparison (only if sample includes 2020)
+# 2) Policy-rule fit plots (full sample only)
 # =========================
-has_2020 = any(year.(skipmissing(df.date)) .== 2020)
+p_res = plot(df.date, df.policy_residual,
+    label="Residual", legend=:topleft,
+    xlabel="Date", ylabel="Residual",
+    title="FR007 Residuals ($(s.label))",
+    color=:blue, alpha=0.8)
+hline!([0.0], linestyle=:dot, color=:black, alpha=0.5, label="")
+display(p_res)
+savefig(p_res, joinpath(ROBUST_DIR, "FR007_residuals_comparison.png"))
 
-if has_2020
-    df_ex2020 = df[year.(df.date) .!= 2020, :]
-    cols_ex = [:FR007, :FR007_l1, :cpi_gap_l1, :gap_pos_l1, :gap_neg_l1, :fx_gap_l1]
-    complete_ex = completecases(df_ex2020[:, cols_ex])
-
-    model_ex2020 = lm(@formula(FR007 ~ FR007_l1 + cpi_gap_l1 + gap_pos_l1 + gap_neg_l1 + fx_gap_l1), df_ex2020[complete_ex, :])
-
-    df_ex2020 = df_ex2020[complete_ex, :]
-    df_ex2020.pred_FR007_ex = predict(model_ex2020)
-    df_ex2020.policy_residual_ex = GLM.residuals(model_ex2020)
-
-    println("\n=== Model (excluding 2020) ===")
-    println(model_ex2020)
-
-    # Robustness plots
-    p_res = plot(df.date, df.policy_residual,
-        label="Full sample", legend=:topleft,
-        xlabel="Date", ylabel="Residual",
-        title="FR007 Residuals: Full vs Excl. 2020 ($(s.label))",
-        color=:blue, alpha=0.7)
-    plot!(p_res, df_ex2020.date, df_ex2020.policy_residual_ex,
-        label="Excl. 2020", color=:red, linestyle=:dash, alpha=0.7)
-    hline!([0.0], linestyle=:dot, color=:black, alpha=0.5, label="")
-    display(p_res)
-    savefig(p_res, joinpath(ROBUST_DIR, "FR007_residuals_comparison.png"))
-
-    p_fit = plot(df.date, df.FR007,
-        label="Actual FR007", legend=:topleft,
-        xlabel="Date", ylabel="FR007",
-        title="Actual vs Predicted FR007: Full vs Excl. 2020 ($(s.label))",
-        color=:black)
-    plot!(p_fit, df.date, df.pred_FR007,
-        label="Predicted (full)", color=:blue, linestyle=:dash)
-    plot!(p_fit, df_ex2020.date, df_ex2020.pred_FR007_ex,
-        label="Predicted (excl. 2020)", color=:red, linestyle=:dot)
-    display(p_fit)
-    savefig(p_fit, joinpath(ROBUST_DIR, "FR007_fit_comparison.png"))
-
-    coef_full   = coef(model1)
-    coef_ex     = coef(model_ex2020)
-    coef_names  = coefnames(model1)
-    n_coef      = length(coef_names)
-
-    p_coef = plot(1:n_coef, coef_full,
-        seriestype=:bar, label="Full sample",
-        xticks=(1:n_coef, coef_names), xrotation=30,
-        ylabel="Coefficient", title="Coefficient Comparison ($(s.label))",
-        alpha=0.6, color=:blue, legend=:topright)
-    plot!(p_coef, (1:n_coef) .+ 0.3, coef_ex,
-        seriestype=:bar, label="Excl. 2020",
-        alpha=0.6, color=:red, bar_width=0.3)
-    display(p_coef)
-    savefig(p_coef, joinpath(ROBUST_DIR, "FR007_coef_comparison.png"))
-end
+p_fit = plot(df.date, df.FR007,
+    label="Actual FR007", legend=:topleft,
+    xlabel="Date", ylabel="FR007",
+    title="Actual vs Predicted FR007 ($(s.label))",
+    color=:black)
+plot!(p_fit, df.date, df.pred_FR007,
+    label="Predicted", color=:blue, linestyle=:dash)
+display(p_fit)
+savefig(p_fit, joinpath(ROBUST_DIR, "FR007_fit_comparison.png"))
 
 # ============================================================================
 # 3) BVAR with Minnesota Priors + IV-SVAR Identification

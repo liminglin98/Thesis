@@ -266,9 +266,16 @@ p_gdp = plot(dates_est, Y_dep[:, gdp_idx],
     title="GDP YoY: In-Sample Fit & $(H_fc)-Month Forecast ($(s.label))")
 plot!(p_gdp, dates_est, X * B_post[:, gdp_idx],
     label="Fitted (BVAR)", color=:blue, linestyle=:dash, linewidth=1.5)
+actual_fc = dropmissing(df_raw, [:date, :realgdp_monthly_yoy])
+actual_fc = filter(r -> r.date >= fc_dates[1] && r.date <= fc_dates[end], actual_fc)
+if nrow(actual_fc) > 0
+    plot!(p_gdp, actual_fc.date, actual_fc.realgdp_monthly_yoy,
+        label="Actual (forecast period)", color=:black, linestyle=:dash,
+        linewidth=1.5)
+end
 plot!(p_gdp, fc_dates, fc[:, gdp_idx],
-    label="Forecast", color=:red, linestyle=:dot,
-    linewidth=2, marker=:circle, markersize=3)
+    label="Forecast", color=:red, linestyle=:solid,
+    linewidth=2)
 hline!([0], color=:gray, linestyle=:dot, alpha=0.5, label="")
 display(p_gdp)
 savefig(p_gdp, joinpath(DIAG_DIR, "bvar_gdp_forecast.png"))

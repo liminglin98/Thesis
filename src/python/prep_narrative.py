@@ -7,9 +7,78 @@ Output: romer_china_data.csv
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import warnings
+import re
 from functools import reduce
 from config import PROJECT_ROOT, RAW_DIR, DERIVED_DIR
 from fetch_akshare import fetch_fr007_daily, fetch_cpr_daily
+
+
+CMPI_RENAME_MAP = {
+    "正回购利率": {
+        "Unnamed: 1": "Repo14days",
+        "Unnamed: 2": "Repo21days",
+        "Unnamed: 3": "Repo28days",
+        "Unnamed: 4": "Repo91days",
+        "Unnamed: 5": "Repo182days",
+        "Unnamed: 6": "Repo364days",
+    },
+    "逆回购利率": {
+        "Unnamed: 1": "ReRepo7days",
+        "Unnamed: 2": "ReRepo14days",
+        "Unnamed: 3": "ReRepo21days",
+        "Unnamed: 4": "ReRepo28days",
+        "Unnamed: 5": "ReRepo91days",
+    },
+    "国库现金利率": {
+        "Unnamed: 1": "TC3months",
+        "Unnamed: 2": "TC6months",
+        "Unnamed: 3": "TC9months",
+    },
+    "常备借贷便利利率": {
+        "Unnamed: 1": "SLFovernight",
+        "Unnamed: 2": "SLF7days",
+        "Unnamed: 3": "SLF1month",
+    },
+    "短期流动性工具利率": {
+        "表五：短期流动性调节工具（SLO）操作利率": "SLO",
+        "Unnamed: 2": "ReverseSLO",
+    },
+    "央行票据发行利率": {
+        "Unnamed: 1": "CBB3months",
+        "Unnamed: 2": "CBB6months",
+        "Unnamed: 3": "CBB1year",
+        "Unnamed: 4": "CBB3years",
+    },
+    "定期存款基准利率": {
+        "Unnamed: 1": "TD3months",
+        "Unnamed: 2": "TD1year",
+    },
+    "金融机构在央行存款利率": {
+        "Unnamed: 1": "RequiredReserve",
+        "Unnamed: 2": "ExcessReserve",
+    },
+    "中长期贷款基准利率": {
+        "Unnamed: 1": "ML1_3years",
+        "Unnamed: 2": "ML3_5years",
+    },
+    "中期借贷便利MLF利率": {
+        "Unnamed: 1": "MLF3months",
+        "Unnamed: 2": "MLF6months",
+        "Unnamed: 3": "MLF1year",
+    },
+    "抵押补充贷款利率": {
+        "Unnamed: 1": "PSL",
+    },
+    "贷款市场报价利率LPR": {
+        "Unnamed: 1": "LPR1year",
+        "Unnamed: 2": "LPR5years",
+    },
+    "存款准备金率RRR": {
+        "Unnamed: 1": "RRRLarge",
+        "Unnamed: 2": "RRRSmall",
+    },
+}
 
 
 def load_fr007_monthly():
@@ -28,7 +97,9 @@ def load_fr007_monthly():
 
 def load_official_rates():
     """Official OMO 7-day reverse repo rate from CMPI.xlsx."""
-    omo_df = pd.read_excel(RAW_DIR / "CMPI.xlsx", sheet_name="逆回购利率", header=1, index_col=False)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Workbook contains no default style*")
+        omo_df = pd.read_excel(RAW_DIR / "CMPI.xlsx", sheet_name="逆回购利率", header=1, index_col=False)
     omo_df = omo_df[["时间", "7天"]].rename(columns={"时间": "date", "7天": "omo7d"})
     omo_df["date"] = pd.to_datetime(omo_df["date"], errors="coerce")
     omo_df["omo7d"] = pd.to_numeric(omo_df["omo7d"], errors="coerce")
@@ -103,78 +174,115 @@ def load_targets(romer_df):
     return romer_df
 
 
-def _parse_cmpi_sheet(sheet_df):
-    """Parse one CMPI sheet into date + sheet average rate."""
-    df = sheet_df.copy()
-    df.columns = [str(c).strip() for c in df.columns]
+def load_cmpi_monthly():
+    """Build monthly CMPI using the same logic as Data.ipynb, with month aggregation."""
+    cmfile = RAW_DIR / "CMPI.xlsx"
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Workbook contains no default style*")
+        xls = pd.ExcelFile(cmfile)
 
-    first_col = df.columns[0]
-    df["date"] = pd.to_datetime(df[first_col], errors="coerce")
+    cmpi_dfs = {}
+    for sheet_name in xls.sheet_names:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Workbook contains no default style*")
+            df = pd.read_excel(cmfile, sheet_name=sheet_name)
 
-    if df["date"].notna().sum() < 5 and len(df) > 1:
-        alt = sheet_df.copy()
-        alt.columns = [str(x).strip() for x in alt.iloc[0].tolist()]
-        alt = alt.iloc[1:].copy()
-        alt_first = alt.columns[0]
-        alt["date"] = pd.to_datetime(alt[alt_first], errors="coerce")
-        df = alt
+        df = df.iloc[1:].copy()
+        first_col = df.columns[0]
+        df = df.rename(columns={first_col: "date"})
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df = df[df["date"].dt.year >= 2000]
 
-    numeric_cols = [c for c in df.columns if c != "date"]
+        clean_sheet_name = re.sub(r"[（）()]", "", sheet_name).strip()
+        rename_dict = CMPI_RENAME_MAP.get(clean_sheet_name, {})
+        if rename_dict:
+            df = df.rename(columns=rename_dict)
+
+        df["month"] = df["date"].dt.to_period("M")
+        candidate_cols = [c for c in df.columns if c not in ["date", "month"]]
+        for col in candidate_cols:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        if numeric_cols:
+            sheet_prefix = re.sub(r"\s+", "", clean_sheet_name)
+            prefixed_map = {col: f"{sheet_prefix}_{col}" for col in numeric_cols}
+            df = df[["month"] + numeric_cols].rename(columns=prefixed_map)
+            df = df.groupby("month", as_index=False).mean(numeric_only=True)
+        else:
+            df = df[["month"]].drop_duplicates().reset_index(drop=True)
+
+        cmpi_dfs[f"{clean_sheet_name}_df"] = df
+
+    if not cmpi_dfs:
+        return pd.DataFrame(columns=["date", "cmpi", "cmpi_n_indicators"])
+
+    cmpi_df = reduce(
+        lambda left, right: pd.merge(left, right, on="month", how="outer"),
+        list(cmpi_dfs.values())
+    )
+
+    numeric_cols = cmpi_df.select_dtypes(include=[np.number]).columns.tolist()
     for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
+        mean_val = cmpi_df[col].mean()
+        std_val = cmpi_df[col].std()
+        if pd.notna(std_val) and std_val != 0:
+            cmpi_df[f"{col}_standardized"] = (cmpi_df[col] - mean_val) / std_val
+        else:
+            cmpi_df[f"{col}_standardized"] = np.nan
 
-    df["sheet_avg"] = df[numeric_cols].mean(axis=1, skipna=True)
-    return df[["date", "sheet_avg"]].dropna()
+    standardized_cols = [c for c in cmpi_df.columns if c.endswith("_standardized")]
+    cmpi_df["cmpi"] = cmpi_df[standardized_cols].mean(axis=1)
+    cmpi_df["cmpi_n_indicators"] = cmpi_df[standardized_cols].notna().sum(axis=1)
+    cmpi_df["date"] = cmpi_df["month"].dt.to_timestamp()
+
+    return cmpi_df[["date", "cmpi", "cmpi_n_indicators"]]
+
+
+def _trend_deviation(series, window=12):
+    """Return the deviation of a monthly series from a smooth trend."""
+    trend = series.rolling(window=window, center=True, min_periods=6).mean()
+    trend = trend.bfill().ffill()
+    return series - trend
 
 
 def save_cmpi_vs_fr007_plot(romer_df):
-    """Save standardized CMPI composite proxy vs FR007 monthly comparison chart."""
+    """Save monthly CMPI vs FR007 trend-deviation comparison chart."""
     out_dir = PROJECT_ROOT / "outputs" / "robustness"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    cmfile = RAW_DIR / "CMPI.xlsx"
-    xls = pd.ExcelFile(cmfile)
+    if "cmpi" not in romer_df.columns:
+        cmpi_df = load_cmpi_monthly()
+        plot_df = romer_df[["date", "FR007"]].merge(cmpi_df[["date", "cmpi"]], on="date", how="left")
+    else:
+        plot_df = romer_df[["date", "FR007", "cmpi"]].copy()
 
-    parsed = []
-    for sheet_name in xls.sheet_names:
-        sheet_df = pd.read_excel(cmfile, sheet_name=sheet_name)
-        parsed_sheet = _parse_cmpi_sheet(sheet_df)
-        if not parsed_sheet.empty:
-            parsed.append(parsed_sheet)
-
-    if not parsed:
-        print("Warning: no CMPI series parsed; skipped CMPI vs FR007 plot")
-        return
-
-    cmpi_df = pd.concat(parsed, ignore_index=True)
-    cmpi_df = (
-        cmpi_df.groupby(pd.Grouper(key="date", freq="ME"))["sheet_avg"]
-        .mean()
-        .reset_index()
-        .rename(columns={"sheet_avg": "cmpi_proxy"})
-    )
-
-    plot_df = romer_df[["date", "FR007"]].dropna().merge(cmpi_df, on="date", how="inner")
-    plot_df = plot_df.dropna(subset=["FR007", "cmpi_proxy"]).copy()
+    plot_df["date"] = pd.to_datetime(plot_df["date"]).dt.to_period("M").dt.to_timestamp()
+    plot_df = plot_df.dropna(subset=["FR007", "cmpi"]).copy()
     if plot_df.empty:
         print("Warning: CMPI merge produced empty data; skipped CMPI vs FR007 plot")
         return
 
-    for col in ["FR007", "cmpi_proxy"]:
-        std = plot_df[col].std(ddof=0)
-        plot_df[f"{col}_z"] = (plot_df[col] - plot_df[col].mean()) / (std if std else 1.0)
+    for col in ["FR007", "cmpi"]:
+        plot_df[f"{col}_trend_dev"] = _trend_deviation(plot_df[col])
+        std = plot_df[f"{col}_trend_dev"].std(ddof=0)
+        plot_df[f"{col}_trend_dev_z"] = (
+            plot_df[f"{col}_trend_dev"] - plot_df[f"{col}_trend_dev"].mean()
+        ) / (std if std else 1.0)
 
     fig, ax = plt.subplots(figsize=(10.5, 5.8))
-    ax.plot(plot_df["date"], plot_df["FR007_z"], color="tab:blue", lw=1.7, label="FR007 (z-score)")
+    ax.plot(plot_df["date"], plot_df["FR007_trend_dev_z"], color="tab:blue", lw=1.7, label="FR007 (trend deviation)")
     ax.plot(
         plot_df["date"],
-        plot_df["cmpi_proxy_z"],
+        plot_df["cmpi_trend_dev_z"],
         color="tab:orange",
         lw=1.7,
-        label="CMPI composite proxy (z-score)",
+        label="CMPI (trend deviation)",
     )
-    ax.set_title("CMPI vs FR007 (Standardized Levels)")
-    ax.set_ylabel("Standardized units")
+    ax.set_title("CMPI vs FR007 (Monthly Deviations from Trend)")
+    ax.set_ylabel("Standardized trend deviation")
     ax.set_xlabel("Date")
     ax.grid(alpha=0.25)
     ax.legend(loc="upper left", framealpha=0.9)
@@ -198,6 +306,7 @@ def main():
     omo_df = load_official_rates()
     cpr_df = load_central_parity()
     ip_df = load_industrial_output()
+    cmpi_df = load_cmpi_monthly()
     neer_df = pd.read_csv(
         RAW_DIR / "RBCNBIS_PC1.csv", encoding="gbk", sep=",", header=0, index_col=0, engine="python"
     )
@@ -212,6 +321,7 @@ def main():
             omo_df[["date", "omo7d"]],
             cpr_df[["date", "CNYUSDCPR"]],
             ip_df[["date", "IP_yoy"]],
+            cmpi_df[["date", "cmpi", "cmpi_n_indicators"]],
             neer_df[["date", "neer_yoy"]],
         ]
     ).sort_values("date").reset_index(drop=True)

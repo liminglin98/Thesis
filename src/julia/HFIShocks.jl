@@ -256,6 +256,18 @@ fig_compare = plot(p_compare...,
 display(fig_compare)
 savefig(fig_compare, joinpath(MAIN_DIR, "irf_hfi_comparison.png"))
 
+# Monthly shock series
+df_series = dropmissing(df, [:date, :shock_policy, :shock_policy_change])
+p_series = plot(df_series.date, df_series.shock_policy,
+    label="Any announcement", color=:darkblue, linewidth=1.5,
+    xlabel="Date", ylabel="Monthly FR007 change",
+    title="HFI Monthly Shock Series ($(s.label))")
+plot!(p_series, df_series.date, df_series.shock_policy_change,
+    label="Rate change only", color=:darkred, linewidth=1.5, linestyle=:dash)
+hline!([0], color=:gray, linestyle=:dot, alpha=0.5, label="")
+display(p_series)
+savefig(p_series, joinpath(MAIN_DIR, "hfi_shock_series.png"))
+
 # Diagnostics summary
 println("\n" * "="^60)
 println("Diagnostics Summary [$(s.label)]")

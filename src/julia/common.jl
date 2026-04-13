@@ -11,7 +11,6 @@ const DERIVED_DIR  = joinpath(PROJECT_ROOT, "data", "derived")
 # --- Sample periods ---
 const SAMPLES = [
     (start_date=Date(2002,1,1), end_date=Date(2025,12,1), label="2025"),
-    (start_date=Date(2002,1,1), end_date=Date(2019,12,1), label="2019"),
     (start_date=Date(2002,1,1), end_date=Date(2022,12,1), label="2022"),
 ]
 

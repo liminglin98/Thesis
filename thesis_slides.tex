@@ -179,6 +179,9 @@ monetary policy shock series.
   \item[$\circ$] We retain FR007 (the actual market rate that anchors HFI surprises
         downstream) while adopting MANR2026's FX specification and the lag terms of those gap variables, which mechanically make the policy rates forward-looking.
 \end{itemize}
+
+\vspace{0.15em}
+\textcolor{spgray}{\scriptsize\hyperlink{app:narr_irf}{\beamergotobutton{narrative IRFs}}}
  
 \end{frame}
 
@@ -224,6 +227,11 @@ The rate-change-only series is the primary instrument; the any-announcement seri
 
 \vspace{0.4em}
 \textbf{Caveat.} Das \& Song use 1-year IRS surprises rather than spot FR007 changes; we use spot FR007 due to limited Wind IRS data availability for the early sample, which we plan to revisit.
+
+\textcolor{spgray}{\scriptsize\hyperlink{app:hfi_series}{\beamergotobutton{monthly HFI shock series}}}
+
+\vspace{0.15em}
+\textcolor{spgray}{\scriptsize\hyperlink{app:hfi_irf}{\beamergotobutton{HFI IRFs}}}
 
 \end{frame}
 
@@ -380,20 +388,16 @@ CMPI-based rule across all specifications.
 \begin{frame}{Appendix --- Policy Rule Fit and Residuals}
 \hypertarget{app:rrfit}{}
  
-\textbf{Top.} Actual FR007 vs.\ predicted FR007 from the rule regression.
-\textbf{Bottom.} Estimated residual series $\widehat{\varepsilon}^{\text{MP}}_t$,
+\textbf{Left} Actual FR007 vs.\ predicted FR007 from the rule regression.
+\textbf{Right.} Estimated residual series $\widehat{\varepsilon}^{\text{MP}}_t$,
 used as the narrative monetary policy shock.
  
 \vspace{0.5em}
 \begin{center}
-\includegraphics[width=0.9\textwidth,height=0.28\textheight,keepaspectratio]{outputs/robustness/2025/FR007_fit_comparison.png}\\[0.35em]
-\includegraphics[width=0.9\textwidth,height=0.28\textheight,keepaspectratio]{outputs/robustness/2025/FR007_residuals_comparison.png}
+\includegraphics[width=0.48\textwidth,height=0.5\textheight,keepaspectratio]{outputs/robustness/2025/FR007_fit_comparison.png}
+\hfill
+\includegraphics[width=0.48\textwidth,height=0.5\textheight,keepaspectratio]{outputs/robustness/2025/FR007_residuals_comparison.png}
 \end{center}
-
-\vspace{0.3em}
-\textcolor{spgray}{\scriptsize Robustness: regression re-estimated excluding
-2020 to verify that COVID-period observations do not unduly drive the
-coefficient estimates.}
 
 \hyperlink{slide:rr}{\beamerreturnbutton{back}}
 \end{frame}
@@ -407,13 +411,9 @@ adapted to NBS quarterly GDP (\begin{CJK}{UTF8}{gbsn}当季值\end{CJK}) using
 the sum identity $Q_T = q_{3T-2} + q_{3T-1} + q_{3T}$, with monthly
 indicators consumption / FAI / government spending / trade balance.]}
 
-\vspace{0.5em}
 \begin{center}
-\includegraphics[width=0.9\textwidth,height=0.4\textheight,keepaspectratio]{outputs/diagnostics/gdp_quarterly_vs_proxy_monthly.png}
+\includegraphics[width=0.9\textwidth,height=0.7\textheight,keepaspectratio]{outputs/diagnostics/gdp_quarterly_vs_proxy_monthly.png}
 \end{center}
-
-\vspace{0.25em}
-\textcolor{spgray}{\scriptsize Suggested content: quarterly reported GDP growth points overlaid with the implied proxy monthly GDP path that aggregates back to official quarterly totals.}
  
 \hyperlink{slide:rr}{\beamerreturnbutton{back}}
 \end{frame}
@@ -422,17 +422,49 @@ indicators consumption / FAI / government spending / trade balance.]}
 \begin{frame}{Appendix --- Forecast vs. Actual (Proxy) Monthly GDP}
 \hypertarget{app:gdp_compare}{}
 
-\textbf{Comparison goal.} Visual check of BVAR forecasted monthly GDP against realized proxy monthly GDP in the counterfactual window.
+
+
+\begin{center}
+\includegraphics[width=0.9\textwidth,height=0.8\textheight,keepaspectratio]{outputs/diagnostics/2022/bvar_gdp_forecast.png}
+\end{center}
+
+
+\hyperlink{slide:ltp2}{\beamerreturnbutton{back}}
+\end{frame}
+
+% --- Appendix slide: narrative IRFs ----------------------------------------
+\begin{frame}{Appendix --- Narrative Shock IRFs}
+\hypertarget{app:narr_irf}{}
+
+\textbf{Narrative identification.} Impulse responses to the estimated monthly policy shock from the rule regression.
 
 \vspace{0.5em}
 \begin{center}
-\includegraphics[width=0.9\textwidth,height=0.43\textheight,keepaspectratio]{outputs/diagnostics/2022/bvar_gdp_forecast.png}
+\includegraphics[width=0.92\textwidth,height=0.68\textheight,keepaspectratio]{outputs/main_results/2022/irf_bvar_iv_svar.png}
 \end{center}
 
-\vspace{0.3em}
-\textcolor{spgray}{\scriptsize Placeholder: forecast path from the baseline projection and realized proxy monthly GDP path over the same months, with optional shaded forecast horizon.}
+\vspace{0.2em}
+\textcolor{spgray}{\scriptsize The figure shows the median response and 68\% / 90\% credible sets for the narrative shock system.}
 
-\hyperlink{slide:ltp2}{\beamerreturnbutton{back}}
+\hyperlink{slide:rr2}{\beamerreturnbutton{back}}
+\end{frame}
+
+% --- Appendix slide: HFI comparison (any announcement vs. rate-change-only) --
+% --- Appendix slide: HFI IRFs ----------------------------------------------
+\begin{frame}{Appendix --- HFI Shock IRFs}
+\hypertarget{app:hfi_irf}{}
+
+\textbf{Identification.} Impulse responses to the rate-change-only HFI shock series.
+
+\vspace{0.5em}
+\begin{center}
+\includegraphics[width=0.92\textwidth,height=0.68\textheight,keepaspectratio]{outputs/main_results/2022/irf_hfi_shock_policy_change.png}
+\end{center}
+
+\vspace{0.2em}
+\textcolor{spgray}{\scriptsize The figure reports the median response and uncertainty bands for the main HFI identification scheme.}
+
+\hyperlink{slide:hfi}{\beamerreturnbutton{back}}
 \end{frame}
 
 % --- Appendix slide: HFI comparison (any announcement vs. rate-change-only) --
@@ -449,6 +481,23 @@ indicators consumption / FAI / government spending / trade balance.]}
 
 \vspace{0.3em}
 \textcolor{spgray}{\scriptsize The rate-change-only series serves as the primary instrument in the counterfactual analysis, with the any-announcement series used for robustness checks.}
+
+\hyperlink{slide:hfi}{\beamerreturnbutton{back}}
+\end{frame}
+
+% --- Appendix slide: HFI shock series --------------------------------------
+\begin{frame}{Appendix --- HFI Monthly Shock Series}
+\hypertarget{app:hfi_series}{}
+
+\textbf{Monthly aggregation.} Daily FR007 surprises are summed within each calendar month, yielding the two monthly HFI shock series used in the counterfactual analysis.
+
+\vspace{0.5em}
+\begin{center}
+\includegraphics[width=0.92\textwidth,height=0.55\textheight,keepaspectratio]{outputs/main_results/2022/hfi_shock_series.png}
+\end{center}
+
+\vspace{0.3em}
+\textcolor{spgray}{\scriptsize The solid line corresponds to shocks on any policy announcement day; the dashed line uses rate-change-only identification.}
 
 \hyperlink{slide:hfi}{\beamerreturnbutton{back}}
 \end{frame}

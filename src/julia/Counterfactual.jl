@@ -13,8 +13,7 @@
 #   2. CPI + GDP:         λ_π=1, λ_y=0.5, λ_i=1, λ_e=0
 #   3. CPI + GDP + NEER:  λ_π=1, λ_y=0.5, λ_i=1, λ_e=0.5
 #
-# Three year configurations (counterfactual start → estimation sample):
-#   cfctl 2020 → sample 2019   (pre-COVID IRFs, counterfactual through COVID)
+# Year configurations (counterfactual start → estimation sample):
 #   cfctl 2023 → sample 2022   (pre-deflation IRFs)
 #   cfctl 2023 → sample 2025   (full-sample IRFs)
 #
@@ -348,10 +347,15 @@ function posterior_bands_flex(pi_base, y_base, i_base, ip_base,
     end
     println("  Valid draws: $nv / $n_draws_irf")
     return (;
+        pi_med = nanquantile(pi_d, 0.50),
         pi_lb = nanquantile(pi_d, 0.16), pi_ub = nanquantile(pi_d, 0.84),
+        y_med  = nanquantile(y_d,  0.50),
         y_lb  = nanquantile(y_d,  0.16), y_ub  = nanquantile(y_d,  0.84),
+        i_med  = nanquantile(i_d,  0.50),
         i_lb  = nanquantile(i_d,  0.16), i_ub  = nanquantile(i_d,  0.84),
+        e_med  = nanquantile(e_d,  0.50),
         e_lb  = nanquantile(e_d,  0.16), e_ub  = nanquantile(e_d,  0.84),
+        ip_med = nanquantile(ip_d, 0.50),
         ip_lb = nanquantile(ip_d, 0.16), ip_ub = nanquantile(ip_d, 0.84),
     )
 end
@@ -389,10 +393,15 @@ function posterior_bands_flex_evol(Y, A_list, c,
     end
     println("  Valid evol draws: $nv / $n_draws_irf")
     return (;
+        pi_med = nanquantile(pi_d, 0.50),
         pi_lb = nanquantile(pi_d, 0.16), pi_ub = nanquantile(pi_d, 0.84),
+        y_med  = nanquantile(y_d,  0.50),
         y_lb  = nanquantile(y_d,  0.16), y_ub  = nanquantile(y_d,  0.84),
+        i_med  = nanquantile(i_d,  0.50),
         i_lb  = nanquantile(i_d,  0.16), i_ub  = nanquantile(i_d,  0.84),
+        e_med  = nanquantile(e_d,  0.50),
         e_lb  = nanquantile(e_d,  0.16), e_ub  = nanquantile(e_d,  0.84),
+        ip_med = nanquantile(ip_d, 0.50),
         ip_lb = nanquantile(ip_d, 0.16), ip_ub = nanquantile(ip_d, 0.84),
     )
 end
@@ -581,11 +590,11 @@ for yc in year_configs
 
     # Columns: CPI, GDP, IP, FR007, NEER
     col_vars = [
-        (idx=cpi_idx,   cnfctl=:pi_cnfctl, base=pi_base, e_adj=false, lb=:pi_lb, ub=:pi_ub, tgt=pi_target,  col_title="CPI YoY (%)"),
-        (idx=gdp_idx,   cnfctl=:y_cnfctl,  base=y_base,  e_adj=false, lb=:y_lb,  ub=:y_ub,  tgt=y_target,   col_title="Real GDP YoY (%)"),
-        (idx=ip_idx,    cnfctl=:ip_cnfctl, base=ip_base, e_adj=false, lb=:ip_lb, ub=:ip_ub, tgt=nothing,    col_title="IP YoY (%)"),
-        (idx=fr007_idx, cnfctl=:i_cnfctl,  base=i_base,  e_adj=false, lb=:i_lb,  ub=:i_ub,  tgt=nothing,    col_title="FR007 (%)"),
-        (idx=neer_idx,  cnfctl=:e_cnfctl,  base=e_base,  e_adj=true,  lb=:e_lb,  ub=:e_ub,  tgt=nothing,    col_title="NEER YoY (%)"),
+        (idx=cpi_idx,   cnfctl=:pi_cnfctl, med=:pi_med, base=pi_base, e_adj=false, lb=:pi_lb, ub=:pi_ub, tgt=pi_target,  col_title="CPI YoY (%)"),
+        (idx=gdp_idx,   cnfctl=:y_cnfctl,  med=:y_med,  base=y_base,  e_adj=false, lb=:y_lb,  ub=:y_ub,  tgt=y_target,   col_title="Real GDP YoY (%)"),
+        (idx=ip_idx,    cnfctl=:ip_cnfctl, med=:ip_med, base=ip_base, e_adj=false, lb=:ip_lb, ub=:ip_ub, tgt=nothing,    col_title="IP YoY (%)"),
+        (idx=fr007_idx, cnfctl=:i_cnfctl,  med=:i_med,  base=i_base,  e_adj=false, lb=:i_lb,  ub=:i_ub,  tgt=nothing,    col_title="FR007 (%)"),
+        (idx=neer_idx,  cnfctl=:e_cnfctl,  med=:e_med,  base=e_base,  e_adj=true,  lb=:e_lb,  ub=:e_ub,  tgt=nothing,    col_title="NEER YoY (%)"),
     ]
 
     for (r, rr) in enumerate(rule_results)
@@ -619,8 +628,8 @@ for yc in year_configs
                 fillrange=bd_ub, fillalpha=0.2, fillcolor=lblue, lw=0,
                 label=(r==1 && c==1 ? "68%" : ""))
 
-            # Counterfactual path
-            cnfctl_path = getfield(rr.scenario_res, cv.cnfctl)
+            # Counterfactual path: use posterior median to align with posterior band center.
+            cnfctl_path = getfield(rr.scenario_bands, cv.med)
             if cv.e_adj
                 cnfctl_path = cv.base .+ cnfctl_path
             end
@@ -703,8 +712,8 @@ for yc in year_configs
                 fillrange=bd_ub, fillalpha=0.2, fillcolor=lblue, lw=0,
                 label=(r==1 && c==1 ? "68%" : ""))
 
-            # Evol counterfactual path
-            cnfctl_path = getfield(rr.evol_res, cv.cnfctl)
+            # Evol counterfactual path: use posterior median to align with posterior band center.
+            cnfctl_path = getfield(rr.evol_bands, cv.med)
             if cv.e_adj
                 cnfctl_path = base_evol .+ cnfctl_path
             end

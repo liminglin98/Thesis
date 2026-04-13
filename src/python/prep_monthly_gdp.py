@@ -297,36 +297,44 @@ def combine_monthly(cpi_df, gov_df, proxyfai_df, trade_df, consump_df, spot_df, 
     gdp_monthly_df = gdp_monthly_df.merge(
         gdp_q.rename(columns={"realgdp_chained": "realgdp"}), on="date", how="left"
     )
+
+    # Keep official quarterly YoY growth at quarter-end months for diagnostics.
+    gdp_yoy_q = gdp_df[["date", "realgdpgrowth"]].copy()
+    gdp_yoy_q["date"] = gdp_yoy_q["date"].dt.to_timestamp(how="end").dt.to_period("M").dt.to_timestamp()
+    gdp_monthly_df = gdp_monthly_df.merge(
+        gdp_yoy_q.rename(columns={"realgdpgrowth": "realgdpgrowth_quarterly"}), on="date", how="left"
+    )
+
     gdp_monthly_df = gdp_monthly_df[gdp_monthly_df["date"] < "2026-01-01"].reset_index(drop=True)
     return gdp_monthly_df
 
 
 def save_gdp_construction_plot(gdp_monthly_df):
-    """Save reported quarterly GDP vs proxy monthly GDP construction chart."""
+    """Save proxy monthly GDP YoY with reported quarterly GDP YoY points."""
     out_dir = PROJECT_ROOT / "outputs" / "diagnostics"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    monthly = gdp_monthly_df[["date", "realgdp_monthly"]].dropna().copy()
-    quarterly = gdp_monthly_df[["date", "realgdp"]].dropna().copy()
+    monthly = gdp_monthly_df[["date", "realgdp_monthly_yoy"]].dropna().copy()
+    quarterly = gdp_monthly_df[["date", "realgdpgrowth_quarterly"]].dropna().copy()
 
     fig, ax = plt.subplots(figsize=(10.5, 5.8))
     ax.plot(
         monthly["date"],
-        monthly["realgdp_monthly"],
+        monthly["realgdp_monthly_yoy"],
         color="tab:blue",
         lw=1.6,
-        label="Proxy monthly GDP level",
+        label="Proxy monthly GDP YoY",
     )
     ax.scatter(
         quarterly["date"],
-        quarterly["realgdp"] / 3.0,
+        quarterly["realgdpgrowth_quarterly"],
         color="tab:red",
         s=22,
         zorder=3,
-        label="Reported quarterly GDP / 3 (quarter-end)",
+        label="Reported quarterly GDP YoY (quarter-end)",
     )
-    ax.set_title("Monthly GDP Construction: Reported Quarterly vs Proxy Monthly")
-    ax.set_ylabel("Level (scaled)")
+    ax.set_title("Monthly GDP Construction: YoY Growth Rate")
+    ax.set_ylabel("YoY growth (%)")
     ax.set_xlabel("Date")
     ax.grid(alpha=0.25)
     ax.legend(loc="upper left", framealpha=0.9)
