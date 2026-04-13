@@ -1,4 +1,4 @@
-\documentclass[10pt,aspectratio=169]{beamer}
+\documentclass[10pt,aspectratio=169,t]{beamer}
 
 % ─── Theme & colors ─────────────────────────────────────────────────────────
 \usetheme{metropolis}
@@ -6,9 +6,11 @@
 \usepackage{booktabs}
 \usepackage{verbatim}
 \usepackage{amsmath, amssymb}
+\usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{tikz}
 \usepackage{CJKutf8}
+\usepackage{dsfont}
 \usetikzlibrary{arrows.meta, positioning, shapes.geometric, fit}
 
 \definecolor{spblue}{RGB}{0, 51, 102}
@@ -17,10 +19,17 @@
 \setbeamercolor{frametitle}{bg=spblue}
 \setbeamercolor{progress bar}{fg=spred}
 \setbeamercolor{title separator}{fg=spred}
+\usepackage{etoolbox}
+\AtBeginEnvironment{frame}{%
+  \setlength{\abovedisplayskip}{2pt}
+  \setlength{\belowdisplayskip}{2pt}
+  \setlength{\abovedisplayshortskip}{1pt}
+  \setlength{\belowdisplayshortskip}{1pt}
+}
 
 % ─── Title page metadata ────────────────────────────────────────────────────
 \title{Rule-Based Monetary Policy in China}
-\subtitle{A Counterfactual Analysis Using the Wolf et al.\ (2025) Framework}
+\subtitle{A Counterfactual Analysis Using the Caravello et al.\ (2025) Framework}
 \author{Liming Lin}
 \institute{Sciences Po Paris \\ \small Supervisor: Paul Bouscasse}
 \date{\today}
@@ -39,7 +48,7 @@
 persistently undershooting the official targets set in the annual Government
 Work Report (GWR).
 
-\vspace{0.4em}
+
 \begin{itemize}
   \item GWR CPI targets 2023--2025: \textbf{3\%, 3\%, 2\%}
   \item Realized CPI YoY 2023--2025: roughly \textbf{0\%}
@@ -49,12 +58,10 @@ Work Report (GWR).
         explicitly tied this objective to the conduct of monetary policy.
 \end{itemize}
 
-\vspace{0.6em}
 \textbf{The question.} What would have happened to the Chinese economy if
-the PBoC had strictly followed an inflation-targeting rule during this
+the PBoC had strictly followed some form of rule-based policy during this
 period?
 
-\vspace{0.6em}
 \textbf{Why it matters.}
 \begin{itemize}
   \item Quantifies the policy gap: how far was actual policy from
@@ -92,7 +99,7 @@ requires \textbf{four building blocks}:
 
 \node[box] (rr) {\textbf{(1) Narrative shocks}\\ \scriptsize Chen et al. (2025) \\ Agrippino et al. (2026) policy rule residuals};
 \node[box, right=of rr] (hfi) {\textbf{(2) HFI shocks}\\ \scriptsize Daily FR007 surprises on policy event dates};
-\node[box, right=of hfi] (ltp) {\textbf{(3) Long Term Projections}\\ \scriptsize Reduced Form VAR estimated with 7-variable and Minnesota-prior};
+\node[box, right=of hfi] (ltp) {\textbf{(3) Baseline Projections}\\ \scriptsize Reduced Form VAR estimated with 7-variable and Minnesota-prior};
 
 \node[final, below=1.0cm of hfi] (cf) {\textbf{(4) Counterfactual}\\ \scriptsize Loss-function optimization over the 2D shock space};
 
@@ -113,7 +120,7 @@ requires \textbf{four building blocks}:
   \item Block (3) provides the \textbf{baseline projection} of where the
         economy goes absent any policy intervention.
   \item Block (4) solves for the shock sequence that moves the baseline
-        toward an inflation-targeting path, subject to a multi-objective
+        toward alternative paths, subject to a multi-objective
         loss function.
 \end{itemize}
 
@@ -128,7 +135,6 @@ requires \textbf{four building blocks}:
 \textbf{Specification.} A monthly policy rule for the 7-day interbank repo
 rate (FR007), combining elements from Chen, Xiao
 \& Zha (2025) and Miranda-Agrippino, Nenova \& Rey (2026):
- 
 
 {\small
 \begin{align*}
@@ -141,13 +147,12 @@ rate (FR007), combining elements from Chen, Xiao
 \;+\; \varepsilon_t^{\text{MP}}
 \end{align*}
 }
- 
 
 \textbf{Variable definitions.}
 \begin{itemize}\itemsep0.15em
   \item[$\bullet$] $\text{cpi\_gap}_t = \pi_t - \pi^{*}_t$, where $\pi^*_t$ is
         the annual CPI target from the Government Work Report
-  \item[$\bullet$] $\text{gdp\_gap}_t = g_t - g^{*}_t$, where $g_t$ is monthly real GDP YoY
+  \item[$\bullet$] $\text{gdp\_gap}_t = g_t - g^{*}_t$, where $g_t$ is a proxy to monthly real GDP YoY
         \textcolor{spgray}{\scriptsize(see appendix:
         \hyperlink{app:gdp}{\beamergotobutton{Stock--Watson construction}})}
         and $g^*_t$ is the GWR growth target
@@ -155,8 +160,7 @@ rate (FR007), combining elements from Chen, Xiao
         GDP gap around a 1pp threshold
         \textcolor{spgray}{\scriptsize(see appendix:
         \hyperlink{app:regime}{\beamergotobutton{regime-switch motivation}})}
-  \item[$\bullet$] $\text{fx\_gap}_t$: post-2006 interaction between the change
-        in the central parity rate and the spot--parity deviation
+  \item[$\bullet$] $\text{fx\_gap}_t$: post-2006 indicator (when fixed exchange rate regime   ended) interaction between the change in the central parity rate and the spot--parity deviation
 \end{itemize}
 \end{frame}
 \begin{frame}{Narrative Shocks: Identification and Rationale}
@@ -169,11 +173,11 @@ monetary policy shock series.
 \vspace{0.2em}
 \textbf{Why this hybrid specification?}
 \begin{itemize}\itemsep0.1em
-  \item[$\circ$] CRZ/Chen kept FR007 as the dependent variable but excluded the
-        exchange rate; MANR2026 added the FX interaction but used the CMPI
-        composite on the left-hand side.
+  \item[$\circ$] CXZ2025 kept FR007 as the dependent variable but excluded the
+        exchange rate; MANR2026 added the foreign exchange term but used the a Composite Monetary Policy Indicator on the left-hand side.
+        \textcolor{spgray}{\scriptsize\hyperlink{app:cmpi_fr007}{\beamergotobutton{CMPI vs.\ FR007}}}
   \item[$\circ$] We retain FR007 (the actual market rate that anchors HFI surprises
-        downstream) while adopting MANR2026's FX specification.
+        downstream) while adopting MANR2026's FX specification and the lag terms of those gap variables, which mechanically make the policy rates forward-looking.
 \end{itemize}
  
 \end{frame}
@@ -186,16 +190,17 @@ monetary policy shock series.
 
 \textbf{Identification strategy.} Following Das \& Song (2022), we identify monetary policy surprises as the daily close-to-close change in the FR007 rate around dates on which the PBoC announces a change to one of its core policy instruments:
 
+\vspace{-1em}
 \[
-\text{shock}_t \;=\; \bigl(\text{FR007}_t - \text{FR007}_{t-1}\bigr) \cdot \mathbb{1}\{t \in \mathcal{E}\}
+\text{shock}_t = \bigl(\text{FR007}_t-\text{FR007}_{t-1}\bigr)\cdot\mathds{1}\{t\in\mathcal{E}\}
 \]
+\vspace{-1em}
 
 where $\mathcal{E}$ is the set of policy event dates.
 
-\vspace{0.4em}
-\textbf{Core policy instruments tracked.} Event dates are hand-collected from PBoC announcements (compiled in CMPI.xlsx, Miranda-Agrippino, Nenova \& Rey 2026):
+\textbf{Core policy instruments tracked.} Event dates are hand-collected from PBoC:
 
-\begin{itemize}\itemsep0.15em
+\begin{itemize}
   \item[$\bullet$] 7-day reverse repo rate (OMO) --- the primary short-term policy rate post-2016
   \item[$\bullet$] 1-year Medium-term Lending Facility (MLF) --- introduced 2014, principal medium-term policy tool
   \item[$\bullet$] 1-year Loan Prime Rate (LPR) --- replaced benchmark lending rate as the loan pricing anchor in August 2019
@@ -227,7 +232,7 @@ The rate-change-only series is the primary instrument; the any-announcement seri
 % ═══════════════════════════════════════════════════════════════════════════
 \begin{frame}{Reduced-Form Long-Term Projection: Bayesian VAR}
 
-	extbf{Specification.} A 7-variable monthly BVAR with $p=6$ lags, estimated with a Minnesota-type prior following Giannone, Lenza \& Primiceri (2015):
+\textbf{Specification.} A 7-variable monthly BVAR with $p=6$ lags, estimated with a Minnesota-type prior following Giannone, Lenza \& Primiceri (2015):
 \[
 y_t = c + \sum_{\ell=1}^{6} A_\ell\, y_{t-\ell} + \sum_{k=1}^{4} d_k\, D_t^{\text{covid},k} + u_t,
 \qquad
@@ -236,35 +241,93 @@ u_t \sim \mathcal{N}(0,\Sigma_u)
 where $D_t^{\text{covid},k}$ are monthly dummies for Jan--Apr 2020.
 
 \vspace{0.3em}
-	extbf{Variables in $y_t$ (BVAR ordering, monthly).}
+\textbf{Variables in $y_t$ (BVAR ordering, monthly).}
 {\small
 \[
 y_t = \bigl(g_t,\, \text{IP}_t,\, \pi_t,\, i_t,\, m_t,\, e_t,\, y_t^{US}\bigr)'
 \]
-$g_t$: real GDP YoY (Stock--Watson distribution from quarterly NBS GDP, \hyperlink{app:gdp}{\beamergotobutton{appendix}}); $\text{IP}_t$: industrial production YoY; $\pi_t$: CPI YoY; $i_t$: FR007; $m_t$: M2 YoY growth; $e_t$: RMB NEER YoY; $y_t^{US}$: US industrial production YoY.
+$g_t$: real GDP YoY; $\text{IP}_t$: Industrial Value Added YoY; $\pi_t$: CPI YoY; $i_t$: FR007; $m_t$: M2 YoY growth; $e_t$: RMB Real Effective Exchange Rate YoY; $y_t^{US}$: US output gap YoY; variables reflecting the labor market condition were dropped due to quality and availability issues.
 }
 
 \end{frame}
-\begin{frame}{Reduced-Form Long-Term Projection: Baseline and MA Representation}
+\begin{frame}{Reduced-Form Long-Term Projection }
+\hypertarget{slide:ltp2}{}
 \vspace{0.3em}
-	extbf{Estimation samples.}
+\textbf{Estimation samples.}
 \begin{itemize}\itemsep0.1em
       \item Monthly estimation with COVID dummies included in all runs.
-      \item For each projection exercise, parameters are estimated through $t^*-1$.
-      \item Baseline vintages reported for 2019, 2022, and 2025.
+      \item $A_\ell$ estimated for sample period from 2002 to 2022, and 2025.
 \end{itemize}
 
-
-\vspace{0.2em}
-	extbf{Baseline projection.}
+\textbf{Baseline projection.}
 \[
 \hat{y}_{t^*+h} = \hat{c} + \sum_{\ell=1}^{6} \hat{A}_\ell\, \hat{y}_{t^*+h-\ell},
 \qquad h=1,2,\ldots,H
 \]
-	extbf{No data from the projection window enters the forecast.} For $\ell<h$, $\hat{y}_{t^*+h-\ell}$ is previously forecast; for $\ell\ge h$, it is pre-$t^*$ realized data.
+\textcolor{spgray}{\scriptsize\hyperlink{app:gdp_compare}{\beamergotobutton{forecast vs. actual (proxy) monthly GDP}}}
 
-\vfill
-	extbf{Stored for counterfactual stage:} Wold MA form $y_t = c^* + \sum_{h=0}^{120} \Psi_h\, u_{t-h}$.
+Proposition 1 from Caravello et al.2025 establishes the counterfactual's validity using the Wold representation of the data. Operationally, we follow their approach to compute the baseline path as the BVAR's iterated projection from the pre-counterfactual state, which is equivalent to the Wold representation under invertibility.
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════════════════
+% SLIDE 7 — COUNTERFACTUAL CALCULATION
+% ═══════════════════════════════════════════════════════════════════════════
+\begin{frame}{Solving the Counterfactual}
+\small
+
+\textbf{Inputs.} We take three objects from earlier blocks: baseline paths
+$\pi^{\text{base}}, y^{\text{base}}, i^{\text{base}}$ over a $T$-month window;
+transmission maps $M_\pi, M_y, M_i$ linking narrative and HFI shocks to each variable;
+and policy targets $\pi^*$ (GWR CPI target) and $y^*$ (GWR growth target).
+
+\vspace{0.25em}
+\textbf{Unknown.} We solve for
+$\tilde\nu \in \mathbb{R}^{2T}$, containing one narrative shock and one HFI shock each month.
+Counterfactual paths are baseline plus transmission:
+\[
+\tilde\pi = \pi^{\text{base}} + M_\pi\tilde\nu, \quad
+\tilde y = y^{\text{base}} + M_y\tilde\nu, \quad
+\tilde i = i^{\text{base}} + M_i\tilde\nu.
+\]
+
+\vspace{0.2em}
+\textbf{Loss.} The shock sequence is chosen to minimize:
+\[
+\mathcal{L}(\tilde\nu)
+= \lambda_\pi \|\tilde\pi - \pi^*\|^2
++ \lambda_y \|\tilde y - y^*\|^2
++ \lambda_i \|\tilde i - i_{\text{hist}}^{\text{last}}\|^2_{\Delta}
++ \lambda_e \|\tilde e\|^2.
+\]
+
+\vspace{0.2em}
+\textbf{Terms.} The four terms penalize CPI-target miss, GDP-target miss, non-smooth or abrupt FR007 moves, and exchange-rate instability; the weights $\lambda_\pi,\lambda_y,\lambda_i,\lambda_e$ define the targeting rule.
+
+\vspace{0.2em}
+\textbf{Solution.} $\|\cdot\|_{\Delta}^2$ denotes squared month-to-month FR007 changes with a boundary anchor tying the first counterfactual rate to the last historical FR007. Because paths are linear in $\tilde\nu$ and the loss is quadratic, this is a stacked OLS problem solved by one linear-system call in Julia (\texttt{A \textbackslash b}):
+\[
+\tilde\nu^* = \arg\min_{\tilde\nu}\mathcal{L}(\tilde\nu).
+\]
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════════════════
+% SLIDE 8 — RESULTS PLACEHOLDER
+% ═══════════════════════════════════════════════════════════════════════════
+\begin{frame}{Headline Results}
+
+\begin{center}
+\includegraphics[width=0.96\textwidth,height=0.58\textheight,keepaspectratio]{outputs/main_results/2022/cnfctl_scenario_2023_s2022.png}
+\end{center}
+
+\vspace{0.4em}
+\begin{itemize}\itemsep0.2em
+      \item \textit{[to fill in]} The policy-gap magnitude under each targeting rule, including cumulative narrative and HFI shocks required.
+      \item \textit{[to fill in]} Whether counterfactual CPI diverges meaningfully from baseline or remains constrained by weak transmission.
+      \item \textit{[to fill in]} What the 2019, 2022, and 2025 sample comparison implies about structural stability over time.
+      \item \textit{[to fill in]} Any notable divergence between GDP and IP responses that should be emphasized.
+\end{itemize}
 
 \end{frame}
  
@@ -322,9 +385,10 @@ CMPI-based rule across all specifications.
 used as the narrative monetary policy shock.
  
 \vspace{0.5em}
-% Placeholder images for FR007 fit and residuals
-% Top: Actual vs predicted FR007
-% Bottom: Residual series epsilon_t^MP
+\begin{center}
+\includegraphics[width=0.9\textwidth,height=0.28\textheight,keepaspectratio]{outputs/robustness/2025/FR007_fit_comparison.png}\\[0.35em]
+\includegraphics[width=0.9\textwidth,height=0.28\textheight,keepaspectratio]{outputs/robustness/2025/FR007_residuals_comparison.png}
+\end{center}
 
 \vspace{0.3em}
 \textcolor{spgray}{\scriptsize Robustness: regression re-estimated excluding
@@ -342,8 +406,33 @@ coefficient estimates.}
 adapted to NBS quarterly GDP (\begin{CJK}{UTF8}{gbsn}当季值\end{CJK}) using
 the sum identity $Q_T = q_{3T-2} + q_{3T-1} + q_{3T}$, with monthly
 indicators consumption / FAI / government spending / trade balance.]}
+
+\vspace{0.5em}
+\begin{center}
+\includegraphics[width=0.9\textwidth,height=0.4\textheight,keepaspectratio]{outputs/diagnostics/gdp_quarterly_vs_proxy_monthly.png}
+\end{center}
+
+\vspace{0.25em}
+\textcolor{spgray}{\scriptsize Suggested content: quarterly reported GDP growth points overlaid with the implied proxy monthly GDP path that aggregates back to official quarterly totals.}
  
 \hyperlink{slide:rr}{\beamerreturnbutton{back}}
+\end{frame}
+
+% --- Appendix slide: estimated monthly GDP vs. reported GDP ---------------
+\begin{frame}{Appendix --- Forecast vs. Actual (Proxy) Monthly GDP}
+\hypertarget{app:gdp_compare}{}
+
+\textbf{Comparison goal.} Visual check of BVAR forecasted monthly GDP against realized proxy monthly GDP in the counterfactual window.
+
+\vspace{0.5em}
+\begin{center}
+\includegraphics[width=0.9\textwidth,height=0.43\textheight,keepaspectratio]{outputs/diagnostics/2022/bvar_gdp_forecast.png}
+\end{center}
+
+\vspace{0.3em}
+\textcolor{spgray}{\scriptsize Placeholder: forecast path from the baseline projection and realized proxy monthly GDP path over the same months, with optional shaded forecast horizon.}
+
+\hyperlink{slide:ltp2}{\beamerreturnbutton{back}}
 \end{frame}
 
 % --- Appendix slide: HFI comparison (any announcement vs. rate-change-only) --
@@ -354,14 +443,31 @@ indicators consumption / FAI / government spending / trade balance.]}
 \textbf{Right.} IRF using \emph{rate-change-only} identification --- cleaner shock, smaller sample size.
 
 \vspace{0.5em}
-% Placeholder image for HFI IRF comparison
-% Left: any announcement shock IRF
-% Right: rate-change-only shock IRF
+\begin{center}
+\includegraphics[width=0.92\textwidth,height=0.5\textheight,keepaspectratio]{outputs/main_results/2022/irf_hfi_comparison.png}
+\end{center}
 
 \vspace{0.3em}
 \textcolor{spgray}{\scriptsize The rate-change-only series serves as the primary instrument in the counterfactual analysis, with the any-announcement series used for robustness checks.}
 
 \hyperlink{slide:hfi}{\beamerreturnbutton{back}}
+\end{frame}
+
+% --- Appendix slide: CMPI vs. FR007 comparison ---------------------------------
+\begin{frame}{Appendix --- CMPI vs.\ FR007}
+\hypertarget{app:cmpi_fr007}{}
+
+\textbf{Specification choice.} Comparison of policy rule performance using FR007 (Composite Monetary Policy Indicator \textcolor{spgray}{\scriptsize our hybrid approach}) versus CMPI (Miranda-Agrippino, Nenova \& Rey 2026 baseline).
+
+\vspace{0.5em}
+\begin{center}
+\includegraphics[width=0.9\textwidth,height=0.43\textheight,keepaspectratio]{outputs/robustness/cmpi_vs_fr007.png}
+\end{center}
+
+\vspace{0.3em}
+\textcolor{spgray}{\scriptsize The choice to retain FR007 as the dependent variable while adopting MANR2026's FX specification ensures consistency with the high-frequency identification strategy, which relies on FR007 surprises on policy event dates.}
+
+\hyperlink{slide:rr2}{\beamerreturnbutton{back}}
 \end{frame}
 
 \end{document}

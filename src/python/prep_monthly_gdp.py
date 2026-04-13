@@ -5,8 +5,9 @@ Cells 0–40 of the original Data_Monthly notebook.
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from functools import reduce
-from config import RAW_DIR, DERIVED_DIR
+from config import PROJECT_ROOT, RAW_DIR, DERIVED_DIR
 from fetch_akshare import fetch_urban_fai
 from stock_watson_distribute import prepare_and_run
 
@@ -300,6 +301,43 @@ def combine_monthly(cpi_df, gov_df, proxyfai_df, trade_df, consump_df, spot_df, 
     return gdp_monthly_df
 
 
+def save_gdp_construction_plot(gdp_monthly_df):
+    """Save reported quarterly GDP vs proxy monthly GDP construction chart."""
+    out_dir = PROJECT_ROOT / "outputs" / "diagnostics"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    monthly = gdp_monthly_df[["date", "realgdp_monthly"]].dropna().copy()
+    quarterly = gdp_monthly_df[["date", "realgdp"]].dropna().copy()
+
+    fig, ax = plt.subplots(figsize=(10.5, 5.8))
+    ax.plot(
+        monthly["date"],
+        monthly["realgdp_monthly"],
+        color="tab:blue",
+        lw=1.6,
+        label="Proxy monthly GDP level",
+    )
+    ax.scatter(
+        quarterly["date"],
+        quarterly["realgdp"] / 3.0,
+        color="tab:red",
+        s=22,
+        zorder=3,
+        label="Reported quarterly GDP / 3 (quarter-end)",
+    )
+    ax.set_title("Monthly GDP Construction: Reported Quarterly vs Proxy Monthly")
+    ax.set_ylabel("Level (scaled)")
+    ax.set_xlabel("Date")
+    ax.grid(alpha=0.25)
+    ax.legend(loc="upper left", framealpha=0.9)
+    fig.tight_layout()
+
+    out_path = out_dir / "gdp_quarterly_vs_proxy_monthly.png"
+    fig.savefig(out_path, dpi=180)
+    plt.close(fig)
+    print(f"Saved: {out_path}")
+
+
 def main():
     print("=" * 60)
     print("  prep_monthly_gdp: Building monthly GDP dataset")
@@ -319,6 +357,9 @@ def main():
     # Save intermediate result for downstream scripts
     gdp_monthly_df.to_csv(DERIVED_DIR / "gdp_monthly_df.csv", index=False)
     print(f"Saved: {DERIVED_DIR / 'gdp_monthly_df.csv'}")
+
+    # Save appendix figure used in slides
+    save_gdp_construction_plot(gdp_monthly_df)
     return gdp_monthly_df
 
 

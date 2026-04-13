@@ -6,8 +6,9 @@ Output: romer_china_data.csv
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from functools import reduce
-from config import RAW_DIR, DERIVED_DIR
+from config import PROJECT_ROOT, RAW_DIR, DERIVED_DIR
 from fetch_akshare import fetch_fr007_daily, fetch_cpr_daily
 
 
@@ -102,6 +103,89 @@ def load_targets(romer_df):
     return romer_df
 
 
+def _parse_cmpi_sheet(sheet_df):
+    """Parse one CMPI sheet into date + sheet average rate."""
+    df = sheet_df.copy()
+    df.columns = [str(c).strip() for c in df.columns]
+
+    first_col = df.columns[0]
+    df["date"] = pd.to_datetime(df[first_col], errors="coerce")
+
+    if df["date"].notna().sum() < 5 and len(df) > 1:
+        alt = sheet_df.copy()
+        alt.columns = [str(x).strip() for x in alt.iloc[0].tolist()]
+        alt = alt.iloc[1:].copy()
+        alt_first = alt.columns[0]
+        alt["date"] = pd.to_datetime(alt[alt_first], errors="coerce")
+        df = alt
+
+    numeric_cols = [c for c in df.columns if c != "date"]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df["sheet_avg"] = df[numeric_cols].mean(axis=1, skipna=True)
+    return df[["date", "sheet_avg"]].dropna()
+
+
+def save_cmpi_vs_fr007_plot(romer_df):
+    """Save standardized CMPI composite proxy vs FR007 monthly comparison chart."""
+    out_dir = PROJECT_ROOT / "outputs" / "robustness"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    cmfile = RAW_DIR / "CMPI.xlsx"
+    xls = pd.ExcelFile(cmfile)
+
+    parsed = []
+    for sheet_name in xls.sheet_names:
+        sheet_df = pd.read_excel(cmfile, sheet_name=sheet_name)
+        parsed_sheet = _parse_cmpi_sheet(sheet_df)
+        if not parsed_sheet.empty:
+            parsed.append(parsed_sheet)
+
+    if not parsed:
+        print("Warning: no CMPI series parsed; skipped CMPI vs FR007 plot")
+        return
+
+    cmpi_df = pd.concat(parsed, ignore_index=True)
+    cmpi_df = (
+        cmpi_df.groupby(pd.Grouper(key="date", freq="ME"))["sheet_avg"]
+        .mean()
+        .reset_index()
+        .rename(columns={"sheet_avg": "cmpi_proxy"})
+    )
+
+    plot_df = romer_df[["date", "FR007"]].dropna().merge(cmpi_df, on="date", how="inner")
+    plot_df = plot_df.dropna(subset=["FR007", "cmpi_proxy"]).copy()
+    if plot_df.empty:
+        print("Warning: CMPI merge produced empty data; skipped CMPI vs FR007 plot")
+        return
+
+    for col in ["FR007", "cmpi_proxy"]:
+        std = plot_df[col].std(ddof=0)
+        plot_df[f"{col}_z"] = (plot_df[col] - plot_df[col].mean()) / (std if std else 1.0)
+
+    fig, ax = plt.subplots(figsize=(10.5, 5.8))
+    ax.plot(plot_df["date"], plot_df["FR007_z"], color="tab:blue", lw=1.7, label="FR007 (z-score)")
+    ax.plot(
+        plot_df["date"],
+        plot_df["cmpi_proxy_z"],
+        color="tab:orange",
+        lw=1.7,
+        label="CMPI composite proxy (z-score)",
+    )
+    ax.set_title("CMPI vs FR007 (Standardized Levels)")
+    ax.set_ylabel("Standardized units")
+    ax.set_xlabel("Date")
+    ax.grid(alpha=0.25)
+    ax.legend(loc="upper left", framealpha=0.9)
+    fig.tight_layout()
+
+    out_path = out_dir / "cmpi_vs_fr007.png"
+    fig.savefig(out_path, dpi=180)
+    plt.close(fig)
+    print(f"Saved: {out_path}")
+
+
 def main():
     print("=" * 60)
     print("  prep_narrative: Building narrative shocks dataset")
@@ -135,6 +219,9 @@ def main():
     romer_df = load_targets(romer_df)
     romer_df.to_csv(DERIVED_DIR / "romer_china_data.csv", index=False)
     print(f"Saved: {DERIVED_DIR / 'romer_china_data.csv'}")
+
+    # Save appendix figure used in slides
+    save_cmpi_vs_fr007_plot(romer_df)
     return romer_df
 
 
