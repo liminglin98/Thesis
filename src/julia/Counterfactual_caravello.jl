@@ -58,21 +58,29 @@ function build_two_shock_map(irf_col_1::AbstractVector{<:Real}, irf_col_2::Abstr
     return hcat(build_transmission_map(irf_col_1, T_hor), build_transmission_map(irf_col_2, T_hor))
 end
 
-function _caravello_system(Pi_m, Y_m, I_m, W_pi, W_y, W_i)
+function _caravello_system(Pi_m, Y_m, I_m, E_m, W_pi, W_y, W_i, W_e)
     A_pi = Pi_m' * W_pi
     A_y = Y_m' * W_y
     A_i = I_m' * W_i
-    lhs = A_pi * Pi_m + A_y * Y_m + A_i * I_m
-    return (A_pi=A_pi, A_y=A_y, A_i=A_i, lhs=lhs)
+    A_e = E_m' * W_e
+    lhs = A_pi * Pi_m + A_y * Y_m + A_i * I_m + A_e * E_m
+    return (A_pi=A_pi, A_y=A_y, A_i=A_i, A_e=A_e, lhs=lhs)
 end
 
-function _caravello_solve(sys, Pi_m, Y_m, I_m, pi_x, y_x, i_x, wedge)
-    rhs = sys.A_pi * pi_x + sys.A_y * y_x + sys.A_i * i_x - wedge
+function _caravello_solve(sys, Pi_m, Y_m, I_m, E_m,
+                          pi_x, y_x, i_x, e_x,
+                          pi_target, y_target, i_target, e_target,
+                          wedge)
+    rhs = sys.A_pi * (pi_x .- pi_target) +
+          sys.A_y  * (y_x  .- y_target) +
+          sys.A_i  * (i_x  .- i_target) +
+          sys.A_e  * (e_x  .- e_target) - wedge
     d = sys.lhs \ rhs
     pi_path = pi_x - Pi_m * d
     y_path = y_x - Y_m * d
     i_path = i_x - I_m * d
-    return (pi_path=pi_path, y_path=y_path, i_path=i_path, d=d)
+    e_path = e_x - E_m * d
+    return (pi_path=pi_path, y_path=y_path, i_path=i_path, e_path=e_path, d=d)
 end
 
 """
@@ -88,17 +96,23 @@ Inputs:
 Returns named tuple:
 (pi_path, y_path, i_path, d)
 """
-function cnfctl_caravello(Pi_m, Y_m, I_m,
-                          pi_x, y_x, i_x,
+function cnfctl_caravello(Pi_m, Y_m, I_m, E_m,
+                          pi_x, y_x, i_x, e_x,
+                          pi_target, y_target,
                           i_hist_last::Float64,
-                          W_pi, W_y, W_i,
+                          W_pi, W_y, W_i, W_e,
                           lambda_di::Float64)
     T = size(Pi_m, 1)
     i_init = vcat([i_hist_last], zeros(T - 1))
     wedge = lambda_di * (I_m' * i_init)
+    i_target = fill(i_hist_last, T)
+    e_target = zeros(T)
 
-    sys = _caravello_system(Pi_m, Y_m, I_m, W_pi, W_y, W_i)
-    return _caravello_solve(sys, Pi_m, Y_m, I_m, pi_x, y_x, i_x, wedge)
+    sys = _caravello_system(Pi_m, Y_m, I_m, E_m, W_pi, W_y, W_i, W_e)
+    return _caravello_solve(sys, Pi_m, Y_m, I_m, E_m,
+                            pi_x, y_x, i_x, e_x,
+                            pi_target, y_target, i_target, e_target,
+                            wedge)
 end
 
 """
@@ -109,28 +123,37 @@ Scenario/flexible style one-shot solve:
 """
 function cnfctl_caravello_flexible(Y, A_list, c,
                                    narr_point, hfi_point,
+                                   cf_start::Date,
                                    fcst_date_idx::Int, fcst_hor::Int,
                                    i_hist_last::Float64,
-                                   W_pi, W_y, W_i,
+                   W_pi, W_y, W_i, W_e,
                                    lambda_di::Float64)
     T_hor = fcst_hor
     Pi_m = build_two_shock_map(narr_point[:, irf_cpi_idx], hfi_point[:, irf_cpi_idx], T_hor)
     Y_m = build_two_shock_map(narr_point[:, irf_gdp_idx], hfi_point[:, irf_gdp_idx], T_hor)
     I_m = build_two_shock_map(narr_point[:, irf_fr007_idx], hfi_point[:, irf_fr007_idx], T_hor)
+    E_m = build_two_shock_map(narr_point[:, irf_neer_idx], hfi_point[:, irf_neer_idx], T_hor)
 
     baseline = forecast_from_date(Y, A_list, c, fcst_date_idx - 1, T_hor)
     pi_x = baseline[:, cpi_idx]
     y_x = baseline[:, gdp_idx]
     i_x = baseline[:, fr007_idx]
+    e_x = baseline[:, neer_idx]
 
-    res = cnfctl_caravello(Pi_m, Y_m, I_m,
-                           pi_x, y_x, i_x,
+    cf_dates = [cf_start + Month(h - 1) for h in 1:T_hor]
+    pi_target = [cpi_target_for_year(year(d)) for d in cf_dates]
+    y_target = [gdp_target_for_year(year(d)) for d in cf_dates]
+
+    res = cnfctl_caravello(Pi_m, Y_m, I_m, E_m,
+               pi_x, y_x, i_x, e_x,
+               pi_target, y_target,
                            i_hist_last,
-                           W_pi, W_y, W_i,
+               W_pi, W_y, W_i, W_e,
                            lambda_di)
 
-    return (pi_cnfctl=res.pi_path, y_cnfctl=res.y_path, i_cnfctl=res.i_path, d=res.d,
-            Pi_m=Pi_m, Y_m=Y_m, I_m=I_m)
+    return (pi_cnfctl=res.pi_path, y_cnfctl=res.y_path, i_cnfctl=res.i_path, e_cnfctl=res.e_path, d=res.d,
+        Pi_m=Pi_m, Y_m=Y_m, I_m=I_m, E_m=E_m,
+        pi_target=pi_target, y_target=y_target)
 end
 
 function save_caravello_scenario_figure(sample::String, cf_start::Date,
@@ -241,14 +264,16 @@ function run_minimal_test()
     W_pi = Matrix{Float64}(I, fcst_hor, fcst_hor)
     W_y = Matrix{Float64}(I, fcst_hor, fcst_hor)
     W_i = Matrix{Float64}(I, fcst_hor, fcst_hor)
+    W_e = Matrix{Float64}(I, fcst_hor, fcst_hor)
     lambda_di = 1.0
 
     car = cnfctl_caravello_flexible(
         Y_actual, A_list, c_vec,
         narr_point, hfi_point,
+        cf_start,
         fcst_date_idx, fcst_hor,
         i_hist_last,
-        W_pi, W_y, W_i,
+        W_pi, W_y, W_i, W_e,
         lambda_di,
     )
 
@@ -261,11 +286,10 @@ function run_minimal_test()
     if haskey(saved["results"], key)
         existing_res = saved["results"][key]["res"]
 
-        E_m = build_two_shock_map(narr_point[:, irf_neer_idx], hfi_point[:, irf_neer_idx], fcst_hor)
         IP_m = build_two_shock_map(narr_point[:, irf_ip_idx], hfi_point[:, irf_ip_idx], fcst_hor)
 
-        # Caravello sign convention: paths are baseline - M*d
-        e_car = e_base - E_m * car.d
+        # Caravello solver now returns explicit NEER path.
+        e_car = car.e_cnfctl
         ip_car = ip_base - IP_m * car.d
 
         # Existing flexible output stores NEER as deviation; IP already level.
@@ -290,8 +314,8 @@ function run_minimal_test()
                     car.i_cnfctl[t], existing_res.i_cnfctl[t])
         end
 
-        pi_target = [cpi_target_for_year(year(d)) for d in cnfctl_dates]
-        y_target = [gdp_target_for_year(year(d)) for d in cnfctl_dates]
+        pi_target = car.pi_target
+        y_target = car.y_target
 
         main_dir = main_results_dir(sample)
         fig_path = save_caravello_scenario_figure(
