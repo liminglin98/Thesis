@@ -207,15 +207,25 @@ end
 # Loop over sample periods
 # ============================================================
 
-for s in SAMPLES
+shock_samples = vcat(SAMPLES, SHOCK_SEGMENTS)
+
+for s in shock_samples
 
 println("\n", "="^70)
 println("  HFIShocks — Sample: $(s.start_date) to $(s.end_date)  [$(s.label)]")
 println("="^70)
 
+is_segment = startswith(s.label, "seg_")
+
 MAIN_DIR   = main_results_dir(s.label)
 ROBUST_DIR = robustness_dir(s.label)
+DIAG_DIR   = diagnostics_dir(s.label)
 INTER_DIR  = intermediate_dir(s.label)
+
+policy_irf_out_dir = is_segment ? DIAG_DIR : ROBUST_DIR
+rate_irf_out_dir   = is_segment ? DIAG_DIR : MAIN_DIR
+compare_out_dir    = is_segment ? DIAG_DIR : MAIN_DIR
+series_out_dir     = is_segment ? DIAG_DIR : MAIN_DIR
 
 # Filter by date range
 df = filter(r -> !ismissing(r.date) && r.date >= s.start_date && r.date <= s.end_date, df_raw)
@@ -227,8 +237,8 @@ res_policy_change = run_hfi_bvar(df, :shock_policy_change; label="(rate change o
 # Plots
 fig1 = plot_irfs(res_policy,        "HFI: any policy announcement ($(s.label))", :darkblue)
 fig2 = plot_irfs(res_policy_change, "HFI: rate change only ($(s.label))",         :darkred)
-savefig(fig1, joinpath(ROBUST_DIR, "irf_hfi_shock_policy.png"))
-savefig(fig2, joinpath(MAIN_DIR, "irf_hfi_shock_policy_change.png"))
+savefig(fig1, joinpath(policy_irf_out_dir, "irf_hfi_shock_policy.png"))
+savefig(fig2, joinpath(rate_irf_out_dir, "irf_hfi_shock_policy_change.png"))
 
 # Overlay comparison
 p_compare = []
@@ -254,7 +264,7 @@ fig_compare = plot(p_compare...,
     size=(380*n_cols, 300*ceil(Int, n/n_cols)),
     plot_title="HFI Shock Comparison ($(s.label))")
 display(fig_compare)
-savefig(fig_compare, joinpath(MAIN_DIR, "irf_hfi_comparison.png"))
+savefig(fig_compare, joinpath(compare_out_dir, "irf_hfi_comparison.png"))
 
 # Monthly shock series
 df_series = dropmissing(df, [:date, :shock_policy, :shock_policy_change])
@@ -266,7 +276,7 @@ plot!(p_series, df_series.date, df_series.shock_policy_change,
     label="Rate change only", color=:darkred, linewidth=1.5, linestyle=:dash)
 hline!([0], color=:gray, linestyle=:dot, alpha=0.5, label="")
 display(p_series)
-savefig(p_series, joinpath(MAIN_DIR, "hfi_shock_series.png"))
+savefig(p_series, joinpath(series_out_dir, "hfi_shock_series.png"))
 
 # Diagnostics summary
 println("\n" * "="^60)

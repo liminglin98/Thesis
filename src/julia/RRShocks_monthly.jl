@@ -40,15 +40,23 @@ df_raw.CNYUSDSpot_yoy = (df_raw.CNYUSDSpot ./ lag(df_raw.CNYUSDSpot, 12) .- 1) .
 ##
 # ── Loop over sample periods ────────────────────────────────────────────────
 
-for s in SAMPLES
+shock_samples = vcat(SAMPLES, SHOCK_SEGMENTS)
+
+for s in shock_samples
 
 println("\n", "="^70)
 println("  RRShocks — Sample: $(s.start_date) to $(s.end_date)  [$(s.label)]")
 println("="^70)
 
+is_segment = startswith(s.label, "seg_")
+
 ROBUST_DIR = robustness_dir(s.label)
 MAIN_DIR   = main_results_dir(s.label)
+DIAG_DIR   = diagnostics_dir(s.label)
 INTER_DIR  = intermediate_dir(s.label)
+
+fit_out_dir = is_segment ? DIAG_DIR : ROBUST_DIR
+irf_out_dir = is_segment ? DIAG_DIR : MAIN_DIR
 
 # Filter by date range
 df = filter(r -> !ismissing(r.date) && r.date >= s.start_date && r.date <= s.end_date, df_raw)
@@ -79,7 +87,7 @@ p_res = plot(df.date, df.policy_residual,
     color=:blue, alpha=0.8)
 hline!([0.0], linestyle=:dot, color=:black, alpha=0.5, label="")
 display(p_res)
-savefig(p_res, joinpath(ROBUST_DIR, "FR007_residuals_comparison.png"))
+savefig(p_res, joinpath(fit_out_dir, "FR007_residuals_comparison.png"))
 
 p_fit = plot(df.date, df.FR007,
     label="Actual FR007", legend=:topleft,
@@ -89,7 +97,7 @@ p_fit = plot(df.date, df.FR007,
 plot!(p_fit, df.date, df.pred_FR007,
     label="Predicted", color=:blue, linestyle=:dash)
 display(p_fit)
-savefig(p_fit, joinpath(ROBUST_DIR, "FR007_fit_comparison.png"))
+savefig(p_fit, joinpath(fit_out_dir, "FR007_fit_comparison.png"))
 
 # ============================================================================
 # 3) BVAR with Minnesota Priors + IV-SVAR Identification
@@ -294,7 +302,7 @@ plot_bvar = plot(p_plots...,
     size = (380 * n_cols, 300 * n_rows),
     plot_title = "BVAR + IV-SVAR: +1 pp FR007 shock — RR instrument ($(s.label))")
 display(plot_bvar)
-savefig(plot_bvar, joinpath(MAIN_DIR, "irf_bvar_iv_svar.png"))
+savefig(plot_bvar, joinpath(irf_out_dir, "irf_bvar_iv_svar.png"))
 
 # Diagnostics
 println("\n" * "="^60)

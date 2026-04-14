@@ -289,11 +289,11 @@ function save_rule_figure(method::String, sample::String, rule_label::String,
     all_plot_data  = vcat(hist_data, actual_data)
 
     col_vars = [
-        (idx=cpi_idx,  base=pi_base, cf=pi_cf, tgt=pi_target, ctitle="CPI YoY (%)"),
-        (idx=gdp_idx,  base=y_base,  cf=y_cf,  tgt=y_target,  ctitle="Real GDP YoY (%)"),
-        (idx=ip_idx,   base=ip_base, cf=ip_cf, tgt=nothing,   ctitle="IP YoY (%)"),
-        (idx=fr007_idx,base=i_base,  cf=i_cf,  tgt=nothing,   ctitle="FR007 (%)"),
+        (idx=cpi_idx,  base=pi_base, cf=pi_cf, tgt=pi_target,  ctitle="CPI YoY (%)"),
+        (idx=gdp_idx,  base=y_base,  cf=y_cf,  tgt=y_target,   ctitle="Real GDP YoY (%)"),
+        (idx=fr007_idx,base=i_base,  cf=i_cf,  tgt=nothing,    ctitle="FR007 (%)"),
         (idx=neer_idx, base=e_base,  cf=(e_base .+ e_cf), tgt=nothing, ctitle="NEER YoY (%)"),
+        (idx=ip_idx,   base=ip_base, cf=ip_cf, tgt=nothing,    ctitle="IP YoY (%)"),
     ]
 
     for (sp, cv) in enumerate(col_vars)
@@ -418,9 +418,10 @@ year_configs = [
 
 # Targeting rules (rows in each figure): all include FR007 impact-jump smoothing
 rules = [
-    (label="CPI Targeting",       λ_π=1.0, λ_y=0.0, λ_i=10.0, λ_e=0.0),
-    (label="CPI + GDP Targeting", λ_π=1.0, λ_y=0.5, λ_i=10.0, λ_e=0.0),
-    (label="CPI + GDP + NEER",    λ_π=1.0, λ_y=0.5, λ_i=10.0, λ_e=0.5),
+    (label="CPI Targeting",       λ_π=1.0, λ_y=0.0, λ_i=1.0, λ_e=0.0),
+    (label="CPI + GDP Targeting", λ_π=1.0, λ_y=1.0, λ_i=1.0, λ_e=0.0),
+    (label="CPI + GDP + NEER",    λ_π=1.0, λ_y=0.5, λ_i=1.0, λ_e=0.5),
+    (label="More CPI Focused",       λ_π=2.0, λ_y=1.0, λ_i=1.0, λ_e=1.0),
 ]
 
 # =============================================================================
@@ -588,13 +589,13 @@ for yc in year_configs
     all_plot_dates = vcat(hist_dates, actual_dates_window)
     all_plot_data  = vcat(hist_data, actual_data)
 
-    # Columns: CPI, GDP, IP, FR007, NEER
+    # Columns: CPI, GDP, FR007, NEER, IP
     col_vars = [
         (idx=cpi_idx,   cnfctl=:pi_cnfctl, med=:pi_med, base=pi_base, e_adj=false, lb=:pi_lb, ub=:pi_ub, tgt=pi_target,  col_title="CPI YoY (%)"),
         (idx=gdp_idx,   cnfctl=:y_cnfctl,  med=:y_med,  base=y_base,  e_adj=false, lb=:y_lb,  ub=:y_ub,  tgt=y_target,   col_title="Real GDP YoY (%)"),
-        (idx=ip_idx,    cnfctl=:ip_cnfctl, med=:ip_med, base=ip_base, e_adj=false, lb=:ip_lb, ub=:ip_ub, tgt=nothing,    col_title="IP YoY (%)"),
         (idx=fr007_idx, cnfctl=:i_cnfctl,  med=:i_med,  base=i_base,  e_adj=false, lb=:i_lb,  ub=:i_ub,  tgt=nothing,    col_title="FR007 (%)"),
         (idx=neer_idx,  cnfctl=:e_cnfctl,  med=:e_med,  base=e_base,  e_adj=true,  lb=:e_lb,  ub=:e_ub,  tgt=nothing,    col_title="NEER YoY (%)"),
+        (idx=ip_idx,    cnfctl=:ip_cnfctl, med=:ip_med, base=ip_base, e_adj=false, lb=:ip_lb, ub=:ip_ub, tgt=nothing,    col_title="IP YoY (%)"),
     ]
 
     for (r, rr) in enumerate(rule_results)
@@ -666,6 +667,89 @@ for yc in year_configs
     fname_scenario = "cnfctl_scenario_$(cfctl_year)_s$(yc.sample).png"
     savefig(fig, joinpath(MAIN_DIR, fname_scenario))
     println("\n  Saved: $fname_scenario")
+
+    # --- Extra comparison figure: 2023 start with 2022 sample ---
+    # Compare only "CPI + GDP + NEER" vs "More CPI Focused" (scenario variant).
+    if yc.sample == "2022" && year(yc.cfctl_start) == 2023
+        wanted_labels = Set(["CPI + GDP + NEER", "More CPI Focused"])
+        cmp_results = [rr for rr in rule_results if rr.rule.label in wanted_labels]
+
+        if length(cmp_results) == 2
+            label_order = Dict("CPI + GDP + NEER" => 1, "More CPI Focused" => 2)
+            sort!(cmp_results, by = rr -> label_order[rr.rule.label])
+
+            fig_cmp = plot(layout=(2, n_cols), size=(2200, 700), margin=6Plots.mm,
+                plot_title="Scenario comparison from 2023 — sample 2022")
+
+            for (r, rr) in enumerate(cmp_results)
+                for (c, cv) in enumerate(col_vars)
+                    sp = (r - 1) * n_cols + c
+
+                    # Actual data — one continuous line
+                    plot!(fig_cmp[sp], all_plot_dates, all_plot_data[:, cv.idx],
+                        color=:black, lw=2, label=(r==1 && c==1 ? "Data" : ""))
+
+                    # Baseline forecast
+                    plot!(fig_cmp[sp], cnfctl_dates, cv.base,
+                        color=:gray, lw=1.5, ls=:dash, label=(r==1 && c==1 ? "Forecast" : ""))
+
+                    # Target line (CPI and GDP only)
+                    if cv.tgt !== nothing
+                        plot!(fig_cmp[sp], cnfctl_dates, cv.tgt,
+                            color=:red, lw=1.5, ls=:dot, label=(r==1 && c==1 ? "Target" : ""))
+                    end
+
+                    # 68% posterior bands
+                    bd_lb = getfield(rr.scenario_bands, cv.lb)
+                    bd_ub = getfield(rr.scenario_bands, cv.ub)
+                    if cv.e_adj
+                        bd_lb = cv.base .+ bd_lb
+                        bd_ub = cv.base .+ bd_ub
+                    end
+                    plot!(fig_cmp[sp], cnfctl_dates, bd_lb,
+                        fillrange=bd_ub, fillalpha=0.2, fillcolor=lblue, lw=0,
+                        label=(r==1 && c==1 ? "68%" : ""))
+
+                    # Counterfactual path: posterior median.
+                    cnfctl_path = getfield(rr.scenario_bands, cv.med)
+                    if cv.e_adj
+                        cnfctl_path = cv.base .+ cnfctl_path
+                    end
+                    plot!(fig_cmp[sp], cnfctl_dates, cnfctl_path,
+                        color=blue, lw=2.5, label=(r==1 && c==1 ? "Counterfact'l" : ""))
+
+                    hline!(fig_cmp[sp], [0], color=:gray, ls=:dot, alpha=0.3, label="")
+
+                    all_vals = vcat(
+                        all_plot_data[:, cv.idx],
+                        cnfctl_path,
+                        cv.base,
+                        bd_lb, bd_ub,
+                    )
+                    all_vals = filter(!isnan, all_vals)
+                    if !isempty(all_vals)
+                        ylo, yhi = minimum(all_vals), maximum(all_vals)
+                        pad = 0.15 * max(yhi - ylo, 1.0)
+                        ylims!(fig_cmp[sp], (ylo - pad, yhi + pad))
+                    end
+
+                    if r == 1
+                        title!(fig_cmp[sp], cv.col_title)
+                    end
+                    if c == 1
+                        ylabel!(fig_cmp[sp], rr.rule.label)
+                    end
+                end
+            end
+
+            display(fig_cmp)
+            fname_cmp = "cnfctl_scenario_compare_2023_s2022_neer_vs_cpi_focus.png"
+            savefig(fig_cmp, joinpath(MAIN_DIR, fname_cmp))
+            println("  Saved: $fname_cmp")
+        else
+            println("  Warning: comparison figure skipped (required rules not found).")
+        end
+    end
 
     # --- Build combined 3x5 figure for evol (rows=rules, cols=CPI/GDP/IP/FR007/NEER) ---
     fig_evol = plot(layout=(3, n_cols), size=(2200, 1000), margin=6Plots.mm,

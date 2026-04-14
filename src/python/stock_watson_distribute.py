@@ -17,6 +17,15 @@ Expected columns in gdp_monthly_df:
     - trade balance
     - CNYUSDSpot
     - cpi
+
+Simple idea:
+    We treat quarterly GDP as the sum of three monthly GDP values.
+    Monthly indicators help split each quarterly total into three parts.
+
+In short:
+    Q_t = q_{t,1} + q_{t,2} + q_{t,3}
+
+The code estimates a smooth monthly path that matches this identity.
 """
 
 # ── Cell 1: Imports ──────────────────────────────────────────────────────────
@@ -31,12 +40,13 @@ from scipy.interpolate import CubicSpline
 
 def estimate_trend_quarterly(Q: np.ndarray):
     """
-    Cubic-spline trend through quarterly series.
-    Returns (S_quarterly, s_monthly).
+    Build a smooth quarterly trend and its monthly counterpart.
 
-    For the sum identity Q_T = q_1 + q_2 + q_3:
+    The quarterly trend S_T is the sum of three monthly trend values:
         S_T = s_{3T-2} + s_{3T-1} + s_{3T}
-    so that Q_tilde_T = Q_T / S_T is approximately stationary.
+
+    This lets us work with a detrended quarterly series:
+        Q_tilde_T = Q_T / S_T
     """
     n_q = len(Q)
     t_q = np.arange(n_q, dtype=float)
@@ -58,18 +68,16 @@ def estimate_trend_quarterly(Q: np.ndarray):
 
 def kalman_smoother(Q_tilde, x_m, s_m, S_q, beta, rho, sigma_eps):
     """
-    Kalman filter + RTS smoother for the Stock-Watson state-space model.
+    Kalman filter + RTS smoother for the monthly GDP path.
 
-    Measurement (quarterly, exact adding-up):
-        Q_tilde_T = sum_{j=0}^{2} w_j * (mu_{3T-j} + u_{3T-j})
-        where w_j = s_{3T-j} / S_T
-
-    For Chinese NBS data (当季值), the identity is:
-        Q_T = q_{3T} + q_{3T-1} + q_{3T-2}   (sum, not average)
-
-    Transition (monthly):
-        q_tilde_t = beta0 + x_t'beta[1:] + u_t
+    Monthly model:
+        q_t = mu_t + u_t
         u_t = rho * u_{t-1} + eps_t
+
+    Quarterly adding-up:
+        Q_T = q_{3T-2} + q_{3T-1} + q_{3T}
+
+    The quarterly observation helps pin down the three monthly values.
 
     Returns (q_tilde_smoothed, log_likelihood).
     """
@@ -110,10 +118,8 @@ def kalman_smoother(Q_tilde, x_m, s_m, S_q, beta, rho, sigma_eps):
             # End of quarter: we observe Q_tilde
             T_idx = t // 3
 
-            # Weights from the adding-up identity (SUM, not average)
-            # Q_T = q_{3T} + q_{3T-1} + q_{3T-2}
-            # In detrended form: Q_tilde_T * S_T = sum_j q_tilde_{3T-j} * s_{3T-j}
-            # So: Q_tilde_T = sum_j (s_{3T-j} / S_T) * q_tilde_{3T-j}
+            # Quarterly GDP is the sum of three monthly values.
+            # We use trend-based weights to split the quarterly total.
             w = np.array([
                 s_m[t - 2] / S_q[T_idx],
                 s_m[t - 1] / S_q[T_idx],
@@ -177,8 +183,7 @@ def neg_loglik(params, Q_tilde, x_m, s_m, S_q, k):
 
 def distribute_quarterly(Q_quarterly, x_monthly):
     """
-    Distribute quarterly series Q into monthly estimates using
-    monthly indicators x.
+    Split quarterly GDP into monthly estimates using monthly indicators.
 
     Parameters
     ----------
@@ -188,6 +193,11 @@ def distribute_quarterly(Q_quarterly, x_monthly):
     Returns
     -------
     q_monthly : 1-d array, shape (n_q * 3,)
+
+    Basic idea:
+        1. build a smooth quarterly trend,
+        2. use monthly indicators to guide the split,
+        3. make the three monthly values add up to quarterly GDP.
     """
     n_q = len(Q_quarterly)
     n_m = n_q * 3
@@ -197,11 +207,11 @@ def distribute_quarterly(Q_quarterly, x_monthly):
         x_monthly = x_monthly.reshape(-1, 1)
     k = x_monthly.shape[1]
 
-    # 1. Trends
+    # 1. Smooth trends
     S_q, s_m = estimate_trend_quarterly(Q_quarterly)
     Q_tilde = Q_quarterly / S_q
 
-    # 2. Detrend indicators (each gets its own spline trend)
+    # 2. Detrend the monthly indicators with their own smooth trends
     x_det = np.zeros_like(x_monthly)
     for j in range(k):
         col = x_monthly[:, j]
@@ -210,7 +220,7 @@ def distribute_quarterly(Q_quarterly, x_monthly):
         _, sx = estimate_trend_quarterly(np.maximum(xq, 1e-10))
         x_det[:, j] = col / sx
 
-    # 3. MLE
+    # 3. Estimate the model parameters
     beta0 = np.zeros(k + 1)
     beta0[0] = np.mean(Q_tilde)
     params0 = np.concatenate([beta0, [np.arctanh(0.5), np.log(np.std(Q_tilde) * 0.1 + 1e-6)]])
@@ -226,14 +236,13 @@ def distribute_quarterly(Q_quarterly, x_monthly):
     sig_hat  = np.exp(res.x[k + 2])
     print(f"  β = {np.round(beta_hat, 4)},  ρ = {rho_hat:.4f},  σ = {sig_hat:.6f}")
 
-    # 4. Kalman smoother
+    # 4. Recover the monthly path
     q_tilde_sm, _ = kalman_smoother(Q_tilde, x_det, s_m, S_q, beta_hat, rho_hat, sig_hat)
 
-    # 5. Re-trend
+    # 5. Put the trend back
     q_monthly = q_tilde_sm * s_m
 
-    # 6. Enforce exact adding-up (numerical clean-up)
-    #    For 当季值: Q_T = q_1 + q_2 + q_3  (sum, not average)
+    # 6. Force exact quarterly adding-up
     for i in range(n_q):
         m0 = 3 * i
         total = q_monthly[m0 : m0 + 3].sum()

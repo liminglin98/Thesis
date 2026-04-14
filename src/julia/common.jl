@@ -14,6 +14,13 @@ const SAMPLES = [
     (start_date=Date(2002,1,1), end_date=Date(2022,12,1), label="2022"),
 ]
 
+# Extra segmented windows for shock IRF diagnostics.
+const SHOCK_SEGMENTS = [
+    (start_date=Date(2002,1,1), end_date=Date(2015,12,1), label="seg_2002_2015"),
+    (start_date=Date(2015,1,1), end_date=Date(2020,12,1), label="seg_2015_2020"),
+    (start_date=Date(2020,1,1), end_date=Date(2025,12,1), label="seg_2020_2025"),
+]
+
 function output_dir(subfolder::String)
     d = joinpath(PROJECT_ROOT, "outputs", subfolder)
     mkpath(d)
