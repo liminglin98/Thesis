@@ -184,9 +184,6 @@ function plot_irfs(res, title_suffix, color)
             title=var_labels[j], label="Median",
             xlabel="Months", ylabel="Response",
             legend=:best, linewidth=2.5, color=color)
-        plot!(plt, 0:H, res.irf_90_lo[:, j],
-            fillrange=res.irf_90_hi[:, j],
-            fillalpha=0.15, fillcolor=color, linealpha=0, label="90% CS")
         plot!(plt, 0:H, res.irf_68_lo[:, j],
             fillrange=res.irf_68_hi[:, j],
             fillalpha=0.35, fillcolor=color, linealpha=0, label="68% CS")
@@ -224,8 +221,6 @@ INTER_DIR  = intermediate_dir(s.label)
 
 policy_irf_out_dir = is_segment ? DIAG_DIR : ROBUST_DIR
 rate_irf_out_dir   = is_segment ? DIAG_DIR : MAIN_DIR
-compare_out_dir    = is_segment ? DIAG_DIR : MAIN_DIR
-series_out_dir     = is_segment ? DIAG_DIR : MAIN_DIR
 
 # Filter by date range
 df = filter(r -> !ismissing(r.date) && r.date >= s.start_date && r.date <= s.end_date, df_raw)
@@ -240,43 +235,47 @@ fig2 = plot_irfs(res_policy_change, "HFI: rate change only ($(s.label))",       
 savefig(fig1, joinpath(policy_irf_out_dir, "irf_hfi_shock_policy.png"))
 savefig(fig2, joinpath(rate_irf_out_dir, "irf_hfi_shock_policy_change.png"))
 
-# Overlay comparison
-p_compare = []
-for j in 1:n
-    plt = plot(0:H, res_policy.irf_median[:, j],
-        label="Any announcement", color=:darkblue, linewidth=2)
-    plot!(plt, 0:H, res_policy.irf_68_lo[:, j],
-        fillrange=res_policy.irf_68_hi[:, j],
-        fillalpha=0.2, fillcolor=:darkblue, linealpha=0, label="")
-    plot!(plt, 0:H, res_policy_change.irf_median[:, j],
-        label="Rate change only", color=:darkred, linewidth=2, linestyle=:dash)
-    plot!(plt, 0:H, res_policy_change.irf_68_lo[:, j],
-        fillrange=res_policy_change.irf_68_hi[:, j],
-        fillalpha=0.2, fillcolor=:darkred, linealpha=0, label="")
+if !is_segment
+    # Overlay comparison
+    p_compare = []
+    for j in 1:n
+        plt = plot(0:H, res_policy.irf_median[:, j],
+            label="Any announcement", color=:darkblue, linewidth=2)
+        plot!(plt, 0:H, res_policy.irf_68_lo[:, j],
+            fillrange=res_policy.irf_68_hi[:, j],
+            fillalpha=0.2, fillcolor=:darkblue, linealpha=0, label="")
+        plot!(plt, 0:H, res_policy_change.irf_median[:, j],
+            label="Rate change only", color=:darkred, linewidth=2, linestyle=:dash)
+        plot!(plt, 0:H, res_policy_change.irf_68_lo[:, j],
+            fillrange=res_policy_change.irf_68_hi[:, j],
+            fillalpha=0.2, fillcolor=:darkred, linealpha=0, label="")
+        hline!([0], color=:gray, linestyle=:dot, alpha=0.5, label="")
+        plot!(plt, title=var_labels[j], xlabel="Months", ylabel="Response", legend=:best)
+        push!(p_compare, plt)
+    end
+
+    n_cols = 3
+    fig_compare = plot(p_compare...,
+        layout=(ceil(Int, n/n_cols), n_cols),
+        size=(380*n_cols, 300*ceil(Int, n/n_cols)),
+        plot_title="HFI Shock Comparison ($(s.label))")
+    display(fig_compare)
+    savefig(fig_compare, joinpath(MAIN_DIR, "irf_hfi_comparison.png"))
+
+    # Monthly shock series
+    df_series = dropmissing(df, [:date, :shock_policy, :shock_policy_change])
+    p_series = plot(df_series.date, df_series.shock_policy,
+        label="Any announcement", color=:darkblue, linewidth=1.5,
+        xlabel="Date", ylabel="Monthly FR007 change",
+        title="HFI Monthly Shock Series ($(s.label))")
+    plot!(p_series, df_series.date, df_series.shock_policy_change,
+        label="Rate change only", color=:darkred, linewidth=1.5, linestyle=:dash)
     hline!([0], color=:gray, linestyle=:dot, alpha=0.5, label="")
-    plot!(plt, title=var_labels[j], xlabel="Months", ylabel="Response", legend=:best)
-    push!(p_compare, plt)
+    display(p_series)
+    savefig(p_series, joinpath(MAIN_DIR, "hfi_shock_series.png"))
+else
+    println("Segment mode: skipping non-IRF HFI plots; generating IRFs only.")
 end
-
-n_cols = 3
-fig_compare = plot(p_compare...,
-    layout=(ceil(Int, n/n_cols), n_cols),
-    size=(380*n_cols, 300*ceil(Int, n/n_cols)),
-    plot_title="HFI Shock Comparison ($(s.label))")
-display(fig_compare)
-savefig(fig_compare, joinpath(compare_out_dir, "irf_hfi_comparison.png"))
-
-# Monthly shock series
-df_series = dropmissing(df, [:date, :shock_policy, :shock_policy_change])
-p_series = plot(df_series.date, df_series.shock_policy,
-    label="Any announcement", color=:darkblue, linewidth=1.5,
-    xlabel="Date", ylabel="Monthly FR007 change",
-    title="HFI Monthly Shock Series ($(s.label))")
-plot!(p_series, df_series.date, df_series.shock_policy_change,
-    label="Rate change only", color=:darkred, linewidth=1.5, linestyle=:dash)
-hline!([0], color=:gray, linestyle=:dot, alpha=0.5, label="")
-display(p_series)
-savefig(p_series, joinpath(series_out_dir, "hfi_shock_series.png"))
 
 # Diagnostics summary
 println("\n" * "="^60)

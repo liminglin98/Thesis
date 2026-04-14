@@ -577,12 +577,16 @@ for yc in year_configs
 
     end
 
-    # --- Build combined 3×5 figure (rows=rules, cols=CPI/GDP/IP/FR007/NEER) ---
+    # Main figures exclude "More CPI Focused"; it is shown in a dedicated comparison figure below.
+    main_rule_results = [rr for rr in rule_results if rr.rule.label != "More CPI Focused"]
+
+    # --- Build combined n_rules×5 figure (rows=rules, cols=CPI/GDP/FR007/NEER/IP) ---
     blue  = RGB(0.45, 0.62, 0.70)
     lblue = RGB(0.45, 0.62, 0.70)
     n_cols = 5
+    n_rules = length(main_rule_results)
 
-    fig = plot(layout=(3, n_cols), size=(2200, 1000), margin=6Plots.mm,
+    fig = plot(layout=(n_rules, n_cols), size=(2200, 250 * n_rules + 50), margin=6Plots.mm,
         plot_title="Counterfactual from $(cfctl_year) — sample $(yc.sample)")
 
     # Continuous actual data line: history + counterfactual window (no gap)
@@ -598,7 +602,7 @@ for yc in year_configs
         (idx=ip_idx,    cnfctl=:ip_cnfctl, med=:ip_med, base=ip_base, e_adj=false, lb=:ip_lb, ub=:ip_ub, tgt=nothing,    col_title="IP YoY (%)"),
     ]
 
-    for (r, rr) in enumerate(rule_results)
+    for (r, rr) in enumerate(main_rule_results)
         rule = rr.rule
         for (c, cv) in enumerate(col_vars)
             sp = (r - 1) * n_cols + c
@@ -668,94 +672,91 @@ for yc in year_configs
     savefig(fig, joinpath(MAIN_DIR, fname_scenario))
     println("\n  Saved: $fname_scenario")
 
-    # --- Extra comparison figure: 2023 start with 2022 sample ---
-    # Compare only "CPI + GDP + NEER" vs "More CPI Focused" (scenario variant).
-    if yc.sample == "2022" && year(yc.cfctl_start) == 2023
-        wanted_labels = Set(["CPI + GDP + NEER", "More CPI Focused"])
-        cmp_results = [rr for rr in rule_results if rr.rule.label in wanted_labels]
+    # --- Additional comparison figure: CPI+GDP+NEER vs More CPI Focused ---
+    wanted_labels = Set(["CPI + GDP + NEER", "More CPI Focused"])
+    cmp_results = [rr for rr in rule_results if rr.rule.label in wanted_labels]
 
-        if length(cmp_results) == 2
-            label_order = Dict("CPI + GDP + NEER" => 1, "More CPI Focused" => 2)
-            sort!(cmp_results, by = rr -> label_order[rr.rule.label])
+    if length(cmp_results) == 2
+        label_order = Dict("CPI + GDP + NEER" => 1, "More CPI Focused" => 2)
+        sort!(cmp_results, by = rr -> label_order[rr.rule.label])
 
-            fig_cmp = plot(layout=(2, n_cols), size=(2200, 700), margin=6Plots.mm,
-                plot_title="Scenario comparison from 2023 — sample 2022")
+        fig_cmp = plot(layout=(2, n_cols), size=(2200, 700), margin=6Plots.mm,
+            plot_title="Scenario comparison from $(cfctl_year) — sample $(yc.sample)")
 
-            for (r, rr) in enumerate(cmp_results)
-                for (c, cv) in enumerate(col_vars)
-                    sp = (r - 1) * n_cols + c
+        for (r, rr) in enumerate(cmp_results)
+            for (c, cv) in enumerate(col_vars)
+                sp = (r - 1) * n_cols + c
 
-                    # Actual data — one continuous line
-                    plot!(fig_cmp[sp], all_plot_dates, all_plot_data[:, cv.idx],
-                        color=:black, lw=2, label=(r==1 && c==1 ? "Data" : ""))
+                # Actual data — one continuous line
+                plot!(fig_cmp[sp], all_plot_dates, all_plot_data[:, cv.idx],
+                    color=:black, lw=2, label=(r==1 && c==1 ? "Data" : ""))
 
-                    # Baseline forecast
-                    plot!(fig_cmp[sp], cnfctl_dates, cv.base,
-                        color=:gray, lw=1.5, ls=:dash, label=(r==1 && c==1 ? "Forecast" : ""))
+                # Baseline forecast
+                plot!(fig_cmp[sp], cnfctl_dates, cv.base,
+                    color=:gray, lw=1.5, ls=:dash, label=(r==1 && c==1 ? "Forecast" : ""))
 
-                    # Target line (CPI and GDP only)
-                    if cv.tgt !== nothing
-                        plot!(fig_cmp[sp], cnfctl_dates, cv.tgt,
-                            color=:red, lw=1.5, ls=:dot, label=(r==1 && c==1 ? "Target" : ""))
-                    end
+                # Target line (CPI and GDP only)
+                if cv.tgt !== nothing
+                    plot!(fig_cmp[sp], cnfctl_dates, cv.tgt,
+                        color=:red, lw=1.5, ls=:dot, label=(r==1 && c==1 ? "Target" : ""))
+                end
 
-                    # 68% posterior bands
-                    bd_lb = getfield(rr.scenario_bands, cv.lb)
-                    bd_ub = getfield(rr.scenario_bands, cv.ub)
-                    if cv.e_adj
-                        bd_lb = cv.base .+ bd_lb
-                        bd_ub = cv.base .+ bd_ub
-                    end
-                    plot!(fig_cmp[sp], cnfctl_dates, bd_lb,
-                        fillrange=bd_ub, fillalpha=0.2, fillcolor=lblue, lw=0,
-                        label=(r==1 && c==1 ? "68%" : ""))
+                # 68% posterior bands
+                bd_lb = getfield(rr.scenario_bands, cv.lb)
+                bd_ub = getfield(rr.scenario_bands, cv.ub)
+                if cv.e_adj
+                    bd_lb = cv.base .+ bd_lb
+                    bd_ub = cv.base .+ bd_ub
+                end
+                plot!(fig_cmp[sp], cnfctl_dates, bd_lb,
+                    fillrange=bd_ub, fillalpha=0.2, fillcolor=lblue, lw=0,
+                    label=(r==1 && c==1 ? "68%" : ""))
 
-                    # Counterfactual path: posterior median.
-                    cnfctl_path = getfield(rr.scenario_bands, cv.med)
-                    if cv.e_adj
-                        cnfctl_path = cv.base .+ cnfctl_path
-                    end
-                    plot!(fig_cmp[sp], cnfctl_dates, cnfctl_path,
-                        color=blue, lw=2.5, label=(r==1 && c==1 ? "Counterfact'l" : ""))
+                # Counterfactual path: posterior median.
+                cnfctl_path = getfield(rr.scenario_bands, cv.med)
+                if cv.e_adj
+                    cnfctl_path = cv.base .+ cnfctl_path
+                end
+                plot!(fig_cmp[sp], cnfctl_dates, cnfctl_path,
+                    color=blue, lw=2.5, label=(r==1 && c==1 ? "Counterfact'l" : ""))
 
-                    hline!(fig_cmp[sp], [0], color=:gray, ls=:dot, alpha=0.3, label="")
+                hline!(fig_cmp[sp], [0], color=:gray, ls=:dot, alpha=0.3, label="")
 
-                    all_vals = vcat(
-                        all_plot_data[:, cv.idx],
-                        cnfctl_path,
-                        cv.base,
-                        bd_lb, bd_ub,
-                    )
-                    all_vals = filter(!isnan, all_vals)
-                    if !isempty(all_vals)
-                        ylo, yhi = minimum(all_vals), maximum(all_vals)
-                        pad = 0.15 * max(yhi - ylo, 1.0)
-                        ylims!(fig_cmp[sp], (ylo - pad, yhi + pad))
-                    end
+                all_vals = vcat(
+                    all_plot_data[:, cv.idx],
+                    cnfctl_path,
+                    cv.base,
+                    bd_lb, bd_ub,
+                )
+                all_vals = filter(!isnan, all_vals)
+                if !isempty(all_vals)
+                    ylo, yhi = minimum(all_vals), maximum(all_vals)
+                    pad = 0.15 * max(yhi - ylo, 1.0)
+                    ylims!(fig_cmp[sp], (ylo - pad, yhi + pad))
+                end
 
-                    if r == 1
-                        title!(fig_cmp[sp], cv.col_title)
-                    end
-                    if c == 1
-                        ylabel!(fig_cmp[sp], rr.rule.label)
-                    end
+                if r == 1
+                    title!(fig_cmp[sp], cv.col_title)
+                end
+                if c == 1
+                    ylabel!(fig_cmp[sp], rr.rule.label)
                 end
             end
-
-            display(fig_cmp)
-            fname_cmp = "cnfctl_scenario_compare_2023_s2022_neer_vs_cpi_focus.png"
-            savefig(fig_cmp, joinpath(MAIN_DIR, fname_cmp))
-            println("  Saved: $fname_cmp")
-        else
-            println("  Warning: comparison figure skipped (required rules not found).")
         end
+
+        display(fig_cmp)
+        fname_cmp = "cnfctl_scenario_compare_focus_$(cfctl_year)_s$(yc.sample).png"
+        savefig(fig_cmp, joinpath(MAIN_DIR, fname_cmp))
+        println("  Saved: $fname_cmp")
+    else
+        println("  Warning: comparison figure skipped (required rules not found).")
     end
 
-    # --- Build combined 3x5 figure for evol (rows=rules, cols=CPI/GDP/IP/FR007/NEER) ---
-    fig_evol = plot(layout=(3, n_cols), size=(2200, 1000), margin=6Plots.mm,
+    # --- Build combined n_rulesx5 figure for evol (rows=rules, cols=CPI/GDP/FR007/NEER/IP) ---
+    fig_evol = plot(layout=(n_rules, n_cols), size=(2200, 250 * n_rules + 50), margin=6Plots.mm,
         plot_title="Counterfactual EVOL from $(cfctl_year) — sample $(yc.sample)")
 
-    for (r, rr) in enumerate(rule_results)
+    for (r, rr) in enumerate(main_rule_results)
         rule = rr.rule
         for (c, cv) in enumerate(col_vars)
             sp = (r - 1) * n_cols + c

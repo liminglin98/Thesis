@@ -80,24 +80,28 @@ println(model1)
 # =========================
 # 2) Policy-rule fit plots (full sample only)
 # =========================
-p_res = plot(df.date, df.policy_residual,
-    label="Residual", legend=:topleft,
-    xlabel="Date", ylabel="Residual",
-    title="FR007 Residuals ($(s.label))",
-    color=:blue, alpha=0.8)
-hline!([0.0], linestyle=:dot, color=:black, alpha=0.5, label="")
-display(p_res)
-savefig(p_res, joinpath(fit_out_dir, "FR007_residuals_comparison.png"))
+if !is_segment
+    p_res = plot(df.date, df.policy_residual,
+        label="Residual", legend=:topleft,
+        xlabel="Date", ylabel="Residual",
+        title="FR007 Residuals ($(s.label))",
+        color=:blue, alpha=0.8)
+    hline!([0.0], linestyle=:dot, color=:black, alpha=0.5, label="")
+    display(p_res)
+    savefig(p_res, joinpath(fit_out_dir, "FR007_residuals_comparison.png"))
 
-p_fit = plot(df.date, df.FR007,
-    label="Actual FR007", legend=:topleft,
-    xlabel="Date", ylabel="FR007",
-    title="Actual vs Predicted FR007 ($(s.label))",
-    color=:black)
-plot!(p_fit, df.date, df.pred_FR007,
-    label="Predicted", color=:blue, linestyle=:dash)
-display(p_fit)
-savefig(p_fit, joinpath(fit_out_dir, "FR007_fit_comparison.png"))
+    p_fit = plot(df.date, df.FR007,
+        label="Actual FR007", legend=:topleft,
+        xlabel="Date", ylabel="FR007",
+        title="Actual vs Predicted FR007 ($(s.label))",
+        color=:black)
+    plot!(p_fit, df.date, df.pred_FR007,
+        label="Predicted", color=:blue, linestyle=:dash)
+    display(p_fit)
+    savefig(p_fit, joinpath(fit_out_dir, "FR007_fit_comparison.png"))
+else
+    println("Segment mode: skipping policy-rule fit plots; generating IRFs only.")
+end
 
 # ============================================================================
 # 3) BVAR with Minnesota Priors + IV-SVAR Identification
@@ -285,9 +289,6 @@ for j in 1:n
         label = "Median",
         xlabel = "Months", ylabel = "Response",
         legend = :best, linewidth = 2.5, color = :darkblue)
-    plot!(plt, 0:H, irf_90_lo[:, j],
-        fillrange = irf_90_hi[:, j],
-        fillalpha = 0.15, fillcolor = :steelblue, linealpha = 0, label = "90% CS")
     plot!(plt, 0:H, irf_68_lo[:, j],
         fillrange = irf_68_hi[:, j],
         fillalpha = 0.35, fillcolor = :steelblue, linealpha = 0, label = "68% CS")
