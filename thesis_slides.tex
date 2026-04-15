@@ -39,6 +39,14 @@
 % ─── Title slide ────────────────────────────────────────────────────────────
 \maketitle
 
+% ─── Menu slide ─────────────────────────────────────────────────────────────
+\begin{frame}{Menu}
+\setcounter{tocdepth}{2}
+\tableofcontents
+\end{frame}
+
+\section{Motivation and Question}
+
 % ═══════════════════════════════════════════════════════════════════════════
 % SLIDE 1 — MOTIVATION & RESEARCH QUESTION
 % ═══════════════════════════════════════════════════════════════════════════
@@ -75,6 +83,8 @@ period?
 % ═══════════════════════════════════════════════════════════════════════════
 % SLIDE 2 — METHODOLOGY ROADMAP
 % ═══════════════════════════════════════════════════════════════════════════
+\section{Methodology}
+
 \begin{frame}{Methodology Roadmap}
 
 Following Caravello, McKay \& Wolf (2025), the empirics-only counterfactual
@@ -130,6 +140,8 @@ requires \textbf{four building blocks}:
 % ═══════════════════════════════════════════════════════════════════════════
 % SLIDE 4 — NARRATIVE SHOCKS
 % ═══════════════════════════════════════════════════════════════════════════
+\subsection{Narrative Shocks}
+
 \begin{frame}{Narrative Shocks: Estimated Policy Rule}
 \hypertarget{slide:rr}{}
  
@@ -188,6 +200,8 @@ The Impulse Responses to the shocks (also the later HFI shocks and baseline proj
 % ═══════════════════════════════════════════════════════════════════════════
 % SLIDE 5 — HIGH-FREQUENCY SHOCKS
 % ═══════════════════════════════════════════════════════════════════════════
+\subsection{High-Frequency Identification}
+
 \begin{frame}{High-Frequency Shocks: FR007 Surprises on Policy Event Dates}
 \hypertarget{slide:hfi}{}
 
@@ -231,6 +245,8 @@ In addition, the PBoC's announcements also occur on the same day with other even
 % ═══════════════════════════════════════════════════════════════════════════
 % SLIDE 6 — REDUCED-FORM BVAR BASELINE (LTP)
 % ═══════════════════════════════════════════════════════════════════════════
+\subsection{Long-Term Projection (LTP)}
+
 \begin{frame}{Reduced-Form Long-Term Projection: Bayesian VAR}
 
 \textbf{Specification.} A 7-variable monthly BVAR with $p=6$ lags.
@@ -275,6 +291,8 @@ Proposition 1 from Caravello et al.2025 establishes the counterfactual's validit
 % ═══════════════════════════════════════════════════════════════════════════
 % SLIDE 7 — COUNTERFACTUAL CALCULATION
 % ═══════════════════════════════════════════════════════════════════════════
+\subsection{Counterfactual Solver}
+
 \begin{frame}{Solving the Counterfactual}
 \small
 
@@ -306,39 +324,71 @@ Counterfactual paths are baseline plus transmission:
 
 \textbf{Terms.} The four terms penalize CPI-target miss, GDP-target miss, non-smooth or abrupt FR007 moves, and exchange-rate instability; the weights $\lambda_\pi,\lambda_y,\lambda_i,\lambda_e$ define the targeting rule.
 
+\end{frame}
+
+\begin{frame}{Solving the Counterfactual}
+
 \textbf{Solution.} Because paths are linear in $\tilde\nu$ and the loss is quadratic, this is a stacked OLS problem solved by one linear-system :
 \[
-\tilde\nu^* = \arg\min_{\tilde\nu}\mathcal{L}(\tilde\nu).
+\tilde\nu^* = \arg\min_{\tilde\nu}\mathcal{L}(\tilde\nu)=A_{stack}\backslash b_{stack}.
 \]
 
+where 
+\[
+A_{stack} =
+\begin{bmatrix}
+\sqrt{\lambda_\pi} M_\pi \\
+\sqrt{\lambda_y} M_y \\
+\sqrt{\lambda_i} M_i \\
+\sqrt{\lambda_e} M_e
+\end{bmatrix},
+\qquad
+b_{stack} =
+\begin{bmatrix}\sqrt{\lambda_\pi} (\pi^* - \pi^{\text{base}}) \\
+\sqrt{\lambda_y} (y^* - y^{\text{base}}) \\
+\sqrt{\lambda_i} (\tilde i_{t-1} - i^{\text{base}}) \\
+\sqrt{\lambda_e} (0 - e^{\text{base}})
+\end{bmatrix}. 
+\]
+Algebraically, $\lambda \cdot I = W$ which is the weighting matrix used in the calculation of $\hat{A} = M \cdot W$ for the rules written in the form of $\hat{A}_{x} \tilde{x} +\hat{A}_{z} \tilde{z} = 0$ used in Caravello et al. 2025 and McKay \& Wolf (2023).
+
 \end{frame}
+
 
 % ═══════════════════════════════════════════════════════════════════════════
 % SLIDE 8 — RESULTS PLACEHOLDER
 % ═══════════════════════════════════════════════════════════════════════════
-\begin{frame}{Headline Results}
+\section{Results}
 
+\begin{frame}{Headline Results}
+\hypertarget{slide:cnfctl2}{}
 \begin{center}
 \includegraphics[width=1\textwidth,height=1.3\textheight,keepaspectratio]{outputs/main_results/2022/cnfctl_scenario_2023_s2022.png}\\
-\scriptsize\textcolor{spgray}{\textit{ Counterfactual paths using data until 2022}}
+\scriptsize\textcolor{spgray}{\textit{ Counterfactual paths using data until 2022}}\\
 \end{center}
+\scriptsize The first row corresponds to the strict CPI targeting with a smoothness penalty on interest rate changes: $\lambda_{\pi}=\lambda_i=1$;\\
+\scriptsize The second row adds the penalty for GDP deviation: $\lambda_{\pi}=\lambda_y=\lambda_i=1$;\\
+\scriptsize The third row adds the penalty for exchange rate volatility: $\lambda_{\pi}=\lambda_y=\lambda_i=\lambda_e=1$.
 
+\textcolor{spgray}{\scriptsize\hyperlink{app:cnfctl2025}{\beamergotobutton{Counterfactual paths using data until 2025}}}
 
 \end{frame}
  
-\begin{frame}{Headline Results}
-
-\begin{center}
-\includegraphics[width=1\textwidth,height=1.3\textheight,keepaspectratio]{outputs/main_results/2025/cnfctl_scenario_2023_s2025.png}\\
-\scriptsize\textcolor{spgray}{\textit{ Counterfactual paths using data until 2025}}
-\end{center}
-
-
+\begin{frame}{Takeaways}
+\begin{itemize}
+      \item Across all three targeting rules, FR007 and CPI move in the same direction, more aggressive rate cuts achieve lower inflation, consistent with the price puzzle identified in the IRFs. The tradeoff is that stricter CPI targeting comes at the cost of larger NEER swings and greater output volatility relative to more balanced rules.
+      \begin{itemize}
+            \item Unfortunately, as mentioned before, since net export, consumption and investment are used in the monthly GDP construction, we did not have it in the reduced form forecast and thus cannot calculate the counterfactual path to analyze the effects on them.
+      \end{itemize}
+      \item One important caveat is that the reduced form forecast produces a very pessmisstic baseline path from 2023 onward. Having policy rate below the forecast boosts inflation and output. Same for the Industrial Value Added in the last column; although the it decreases anyway, the counterfactual paths are somewhat better than the forecast.
+\end{itemize}
 \end{frame}
 
 % ═══════════════════════════════════════════════════════════════════════════
 % APPENDIX
 % ═══════════════════════════════════════════════════════════════════════════
+\section{Appendix}
+
 \appendix
  
 % --- Appendix slide: regime switch motivation -------------------------------
@@ -354,9 +404,7 @@ $\mathds{1}_t^{-} = \mathds{1}\{\text{gdp\_gap}_t < 1\}$, then split:
 \]
  
 \textbf{Motivation.} Following Chen, Ren \& Zha (2018), the PBoC's response
-to growth is hypothesised to be \emph{asymmetric}: monetary policy reacts
-more aggressively when realized GDP growth falls meaningfully below the
-official Government Work Report target than when it merely fluctuates around it. MANR2026 further estimated this threshold at around 1pp, meanining that the PBoC tends to tolerate small overshoots. 
+to growth is hypothesised to be asymmetric. MANR2026 further estimated this threshold at around 1pp, meanining that the PBoC tends to tolerate small overshoots in output. 
  
 
  
@@ -385,13 +433,10 @@ used as the narrative monetary policy shock.
 \begin{frame}{Appendix --- Monthly GDP Construction}
 \hypertarget{app:gdp}{}
  
-\textit{[To be filled in: Stock \& Watson (2010) distribution method,
-adapted to NBS quarterly GDP (\begin{CJK}{UTF8}{gbsn}当季值\end{CJK}) using
-the sum identity $Q_T = q_{3T-2} + q_{3T-1} + q_{3T}$, with monthly
-indicators consumption / FAI / government spending / trade balance.]}
+\textbf{Stock \& Watson (2010) distribution method}, adapted to NBS quarterly GDP using the sum identity $Q_T = q_{3T-2} + q_{3T-1} + q_{3T}$, with monthly indicators Consumption / Fixed Assets Investment/ Government Spending / Trade Balance.
 
 \begin{center}
-\includegraphics[width=0.9\textwidth,height=0.7\textheight,keepaspectratio]{outputs/diagnostics/gdp_quarterly_vs_proxy_monthly.png}
+\includegraphics[width=0.9\textwidth,height=0.6\textheight,keepaspectratio]{outputs/diagnostics/gdp_quarterly_vs_proxy_monthly.png}
 \end{center}
  
 \hyperlink{slide:rr}{\beamerreturnbutton{back}}
@@ -441,16 +486,14 @@ indicators consumption / FAI / government spending / trade balance.]}
 \begin{frame}{Appendix --- HFI Shocks: IRF Comparison}
 \hypertarget{app:hfi_compare}{}
 
-\textbf{Left.} IRF of Chinese economy to monetary policy shocks identified from FR007 surprises on \emph{any} PBoC policy announcement day.
-\textbf{Right.} IRF using \emph{rate-change-only} identification --- cleaner shock, smaller sample size.
+\textbf{Blue.} IRF of Chinese economy to monetary policy shocks identified from FR007 surprises on \emph{any} PBoC policy announcement day.
+\textbf{Red.} IRF using \emph{rate-change-only} dates.
 
-\vspace{0.5em}
+
 \begin{center}
-\includegraphics[width=0.92\textwidth,height=0.5\textheight,keepaspectratio]{outputs/main_results/2022/irf_hfi_comparison.png}
+\includegraphics[width=0.92\textwidth,height=0.6\textheight,keepaspectratio]{outputs/main_results/2022/irf_hfi_comparison.png}
 \end{center}
 
-\vspace{0.3em}
-\textcolor{spgray}{\scriptsize The rate-change-only series serves as the primary instrument in the counterfactual analysis, with the any-announcement series used for robustness checks.}
 
 \hyperlink{slide:hfi}{\beamerreturnbutton{back}}
 \end{frame}
@@ -461,13 +504,12 @@ indicators consumption / FAI / government spending / trade balance.]}
 
 \textbf{Monthly aggregation.} Daily FR007 surprises are summed within each calendar month, yielding the two monthly HFI shock series used in the counterfactual analysis.
 
-\vspace{0.5em}
+
 \begin{center}
 \includegraphics[width=0.92\textwidth,height=0.55\textheight,keepaspectratio]{outputs/main_results/2022/hfi_shock_series.png}
 \end{center}
 
-\vspace{0.3em}
-\textcolor{spgray}{\scriptsize The solid line corresponds to shocks on any policy announcement day; the dashed line uses rate-change-only identification.}
+
 
 \hyperlink{slide:hfi}{\beamerreturnbutton{back}}
 \end{frame}
@@ -476,17 +518,27 @@ indicators consumption / FAI / government spending / trade balance.]}
 \begin{frame}{Appendix --- CMPI vs.\ FR007}
 \hypertarget{app:cmpi_fr007}{}
 
-\textbf{Specification choice.} Comparison of policy rule performance using FR007 (Composite Monetary Policy Indicator \textcolor{spgray}{\scriptsize our hybrid approach}) versus CMPI (Miranda-Agrippino, Nenova \& Rey 2026 baseline).
+\textbf{Specification choice.} Comparison of policy indicators' deviations using FR007 versus CMPI (MANR2026).
 
-\vspace{0.5em}
 \begin{center}
-\includegraphics[width=0.9\textwidth,height=0.43\textheight,keepaspectratio]{outputs/robustness/cmpi_vs_fr007.png}
+\includegraphics[width=0.9\textwidth,height=0.6\textheight,keepaspectratio]{outputs/robustness/cmpi_vs_fr007.png}
 \end{center}
 
-\vspace{0.3em}
-\textcolor{spgray}{\scriptsize The choice to retain FR007 as the dependent variable while adopting MANR2026's FX specification ensures consistency with the high-frequency identification strategy, which relies on FR007 surprises on policy event dates.}
+
+\textcolor{spgray}{\scriptsize The choice to retain FR007 can be also attributed to the fact that it contains enough variations, though less than CMPI, to identify the narrative shocks, and it is more directly linked to the HFI shocks identified from FR007 surprises.}
 
 \hyperlink{slide:rr2}{\beamerreturnbutton{back}}
+\end{frame}
+
+\begin{frame}{Appendix ---Headline Results with Data Until 2025}
+\hypertarget{app:cnfctl2025}{}
+
+\begin{center}
+\includegraphics[width=1\textwidth,height=1.3\textheight,keepaspectratio]{outputs/main_results/2025/cnfctl_scenario_2023_s2025.png}\\
+\scriptsize\textcolor{spgray}{\textit{ Counterfactual paths using data until 2025}}
+\end{center}
+\hyperlink{slide:cnfctl2}{\beamerreturnbutton{back}}
+
 \end{frame}
 
 \end{document}

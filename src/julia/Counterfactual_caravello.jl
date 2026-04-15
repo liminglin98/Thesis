@@ -24,6 +24,18 @@ function gdp_target_for_year(yr::Int)
     yr == 2021 ? 6.0 : 5.0
 end
 
+function announced_target_year(d::Date)
+    month(d) >= 3 ? year(d) : year(d) - 1
+end
+
+function cpi_target_for_date(d::Date)
+    cpi_target_for_year(announced_target_year(d))
+end
+
+function gdp_target_for_date(d::Date)
+    gdp_target_for_year(announced_target_year(d))
+end
+
 function forecast_from_date(Y, A_list, c, start_idx, H_fc)
     p_loc = length(A_list)
     n_loc = size(Y, 2)
@@ -141,8 +153,8 @@ function cnfctl_caravello_flexible(Y, A_list, c,
     e_x = baseline[:, neer_idx]
 
     cf_dates = [cf_start + Month(h - 1) for h in 1:T_hor]
-    pi_target = [cpi_target_for_year(year(d)) for d in cf_dates]
-    y_target = [gdp_target_for_year(year(d)) for d in cf_dates]
+    pi_target = [cpi_target_for_date(d) for d in cf_dates]
+    y_target = [gdp_target_for_date(d) for d in cf_dates]
 
     res = cnfctl_caravello(Pi_m, Y_m, I_m, E_m,
                pi_x, y_x, i_x, e_x,

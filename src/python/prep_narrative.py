@@ -153,7 +153,7 @@ def load_industrial_output():
 
 
 def load_targets(romer_df):
-    """Map official GDP and CPI targets to the dataframe."""
+    """Map official GDP and CPI targets, with new annual targets taking effect in March."""
     china_gdp_targets = {
         2000: 7.0, 2001: 7.0, 2002: 7.0, 2003: 7.0, 2004: 7.0,
         2005: 8.0, 2006: 8.0, 2007: 8.0, 2008: 8.0, 2009: 8.0,
@@ -168,9 +168,19 @@ def load_targets(romer_df):
         2015: 3.0, 2016: 3.0, 2017: 3.0, 2018: 3.0, 2019: 3.0,
         2020: 3.5, 2021: 3.0, 2022: 3.0, 2023: 3.0, 2024: 3.0, 2025: 2.0,
     }
-    years = romer_df["date"].dt.year
-    romer_df["target_gdp"] = years.map(china_gdp_targets)
-    romer_df["target_cpi"] = years.map(china_cpi_targets)
+    announced_year = np.where(
+        romer_df["date"].dt.month >= 3,
+        romer_df["date"].dt.year,
+        romer_df["date"].dt.year - 1,
+    )
+    announced_year = pd.Series(announced_year, index=romer_df.index)
+
+    # If the previous year's target is unavailable at the sample start, fall back to same-year target.
+    romer_df["target_gdp"] = announced_year.map(china_gdp_targets)
+    romer_df["target_gdp"] = romer_df["target_gdp"].fillna(romer_df["date"].dt.year.map(china_gdp_targets))
+
+    romer_df["target_cpi"] = announced_year.map(china_cpi_targets)
+    romer_df["target_cpi"] = romer_df["target_cpi"].fillna(romer_df["date"].dt.year.map(china_cpi_targets))
     return romer_df
 
 

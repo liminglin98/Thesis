@@ -81,6 +81,18 @@ function gdp_target_for_year(yr::Int)
     yr == 2021 ? 6.0 : 5.0
 end
 
+function announced_target_year(d::Date)
+    month(d) >= 3 ? year(d) : year(d) - 1
+end
+
+function cpi_target_for_date(d::Date)
+    cpi_target_for_year(announced_target_year(d))
+end
+
+function gdp_target_for_date(d::Date)
+    gdp_target_for_year(announced_target_year(d))
+end
+
 function build_transmission_map(irf_col::Vector{Float64}, T_hor::Int)
     S = min(T_hor, length(irf_col))
     M = zeros(T_hor, S)
@@ -489,8 +501,8 @@ for yc in year_configs
     e_base  = baseline_fc[:, neer_idx]
     ip_base = baseline_fc[:, ip_idx]
     println("  i_hist_last = $(i_hist_last),  i_base[1] = $(i_base[1]),  gap = $(i_base[1] - i_hist_last)")
-    pi_target = [cpi_target_for_year(year(d)) for d in cnfctl_dates]
-    y_target  = [gdp_target_for_year(year(d)) for d in cnfctl_dates]
+    pi_target = [cpi_target_for_date(d) for d in cnfctl_dates]
+    y_target  = [gdp_target_for_date(d) for d in cnfctl_dates]
 
     Pi_m = build_two_shock_map(narr_point[:, irf_cpi_idx],   hfi_point[:, irf_cpi_idx],   fcst_hor)
     Y_m  = build_two_shock_map(narr_point[:, irf_gdp_idx],   hfi_point[:, irf_gdp_idx],   fcst_hor)
