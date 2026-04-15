@@ -322,7 +322,7 @@ Counterfactual paths are baseline plus transmission:
 \]
 
 
-\textbf{Terms.} The four terms penalize CPI-target miss, GDP-target miss, non-smooth or abrupt FR007 moves, and exchange-rate instability; the weights $\lambda_\pi,\lambda_y,\lambda_i,\lambda_e$ define the targeting rule.
+\textbf{Terms.} The four terms penalize CPI-target miss, GDP-target miss, non-smooth or abrupt FR007 moves, and exchange-rate instability; the weights $\lambda_\pi,\lambda_y,\lambda_i,\lambda_e$ define the targeting rule; while the discount factor is set to 1 for simplicity following Caravello et al.2025.
 
 \end{frame}
 
@@ -346,11 +346,11 @@ A_{stack} =
 b_{stack} =
 \begin{bmatrix}\sqrt{\lambda_\pi} (\pi^* - \pi^{\text{base}}) \\
 \sqrt{\lambda_y} (y^* - y^{\text{base}}) \\
-\sqrt{\lambda_i} (\tilde i_{t-1} - i^{\text{base}}) \\
+\sqrt{\lambda_i} (i_t - i_{t-1}) \\
 \sqrt{\lambda_e} (0 - e^{\text{base}})
 \end{bmatrix}. 
 \]
-Algebraically, $\lambda \cdot I = W$ which is the weighting matrix used in the calculation of $\hat{A} = M \cdot W$ for the rules written in the form of $\hat{A}_{x} \tilde{x} +\hat{A}_{z} \tilde{z} = 0$ used in Caravello et al. 2025 and McKay \& Wolf (2023).
+Algebraically, $\lambda \cdot I = W$ which is the weighting matrix used in the calculation of $\hat{A} = M \cdot W$ for the rules written in the form of $\hat{A}_{x} \tilde{x} +\hat{A}_{z} \tilde{z} = 0$ used in Caravello et al. 2025.
 
 \end{frame}
 
