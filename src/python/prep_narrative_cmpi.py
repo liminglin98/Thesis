@@ -1,7 +1,7 @@
 """
 Narrative shocks data preparation.
 Cells 41–56 of the original Data_Monthly notebook.
-Output: romer_china_data.csv
+Output: romer_china_data_cmpi.csv
 """
 
 import numpy as np
@@ -312,7 +312,7 @@ def save_cmpi_vs_fr007_plot(romer_df):
     ax.legend(loc="upper left", framealpha=0.9)
     fig.tight_layout()
 
-    out_path = out_dir / "cmpi_vs_fr007.png"
+    out_path = out_dir / "cmpi_vs_fr007_cmpi.png"
     fig.savefig(out_path, dpi=180)
     plt.close(fig)
     print(f"Saved: {out_path}")
@@ -353,8 +353,9 @@ def main():
     ).sort_values("date").reset_index(drop=True)
 
     romer_df = load_targets(romer_df)
-    romer_df.to_csv(DERIVED_DIR / "romer_china_data.csv", index=False)
-    print(f"Saved: {DERIVED_DIR / 'romer_china_data.csv'}")
+    out_path = DERIVED_DIR / "romer_china_data_cmpi.csv"
+    romer_df.to_csv(out_path, index=False)
+    print(f"Saved: {out_path}")
 
     save_cmpi_vs_fr007_plot(romer_df)
     return romer_df

@@ -38,7 +38,7 @@ def main():
     gdp_monthly_df = pd.read_csv(DERIVED_DIR / "gdp_monthly_df.csv", parse_dates=["date"])
 
     # Load monthly monetary-policy series from narrative prep.
-    full_repo_df = pd.read_csv(DERIVED_DIR / "romer_china_data.csv", parse_dates=["date"])
+    full_repo_df = pd.read_csv(DERIVED_DIR / "romer_china_data_cmpi.csv", parse_dates=["date"])
 
     ip_df = pd.read_csv(
         RAW_DIR / "IP.csv", encoding="gbk", sep=",", header=2, index_col=0, engine="python"

@@ -15,6 +15,7 @@ using Serialization
 include(joinpath(@__DIR__, "common.jl"))
 
 const NARRATIVE_RESULTS_FILE = "narrative_irf_results_cmpi.jls"
+const ROMER_DATA_FILE = "romer_china_data_cmpi.csv"
 
 function cmpi_artifact_name(base::String)
     root, ext = splitext(base)
@@ -22,7 +23,7 @@ function cmpi_artifact_name(base::String)
 end
 ##
 # Load and prepare data once (lags computed on full sample)
-df_raw = CSV.read(joinpath(DERIVED_DIR, "romer_china_data.csv"), DataFrame)
+df_raw = CSV.read(joinpath(DERIVED_DIR, ROMER_DATA_FILE), DataFrame)
 df_raw.date = Date.(df_raw.date)
 
 df_raw.gdp_gap = df_raw.realgdp_monthly_yoy - df_raw.target_gdp
@@ -112,7 +113,7 @@ if !is_segment
         color=:blue, alpha=0.8)
     hline!([0.0], linestyle=:dot, color=:black, alpha=0.5, label="")
     display(p_res)
-    savefig(p_res, joinpath(fit_out_dir, "cmpi_residuals_comparison.png"))
+    savefig(p_res, joinpath(fit_out_dir, cmpi_artifact_name("cmpi_residuals_comparison.png")))
 
     p_fit = plot(df.date, df.cmpi,
         label="Actual CMPI", legend=:topleft,
@@ -122,7 +123,7 @@ if !is_segment
     plot!(p_fit, df.date, df.pred_cmpi,
         label="Predicted", color=:blue, linestyle=:dash)
     display(p_fit)
-    savefig(p_fit, joinpath(fit_out_dir, "cmpi_fit_comparison.png"))
+    savefig(p_fit, joinpath(fit_out_dir, cmpi_artifact_name("cmpi_fit_comparison.png")))
 else
     println("Segment mode: skipping policy-rule fit plots; generating IRFs only.")
 end
