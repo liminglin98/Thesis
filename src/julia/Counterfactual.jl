@@ -432,7 +432,7 @@ year_configs = [
 rules = [
     (label="CPI Targeting",       λ_π=1.0, λ_y=0.0, λ_i=1.0, λ_e=0.0),
     (label="CPI + GDP Targeting", λ_π=1.0, λ_y=1.0, λ_i=1.0, λ_e=0.0),
-    (label="CPI + GDP + NEER",    λ_π=1.0, λ_y=0.5, λ_i=1.0, λ_e=0.5),
+    (label="CPI + GDP + NEER",    λ_π=1.0, λ_y=1.0, λ_i=1.0, λ_e=1.0),
     (label="More CPI Focused",       λ_π=2.0, λ_y=1.0, λ_i=1.0, λ_e=1.0),
 ]
 

@@ -294,18 +294,26 @@ display(p_gdp)
 savefig(p_gdp, joinpath(DIAG_DIR, "bvar_gdp_forecast.png"))
 
 cpi_idx = 3
-cpi_forecast_start = s.end_date + Month(1)
-cpi_forecast_end = maximum(df_raw.date)
+# Match Counterfactual.jl: the baseline path used in the counterfactuals is a
+# recursive forecast starting from the last observed month before 2023.
+cpi_forecast_start = Date(2023, 1, 1)
+cpi_forecast_end = s.label == "2025" ? s.end_date : maximum(df_raw.date)
 H_cpi = max(0, length(cpi_forecast_start:Month(1):cpi_forecast_end))
 cpi_fitted = X * B_post[:, cpi_idx]
 cpi_plot_start = Date(2002, 1, 1)
 actual_cpi = dropmissing(df_raw, [:date, :cpi])
 actual_cpi = filter(r -> r.date >= cpi_plot_start && r.date <= cpi_forecast_end, actual_cpi)
 
-cpi_pred_parts = [DataFrame(date=dates_est, cpi_predicted=cpi_fitted)]
+cpi_fitted_df = DataFrame(date=dates_est, cpi_predicted=cpi_fitted)
+cpi_fitted_df = filter(r -> r.date < cpi_forecast_start, cpi_fitted_df)
+cpi_pred_parts = [cpi_fitted_df]
 cpi_forecast_only = DataFrame(date=Date[], cpi_predicted=Float64[])
 if H_cpi > 0
-    cpi_fc = forecast_from(Y_full, A_list, c_vec, T_full, H_cpi)
+    cpi_forecast_anchor_idx = findlast(d -> d < cpi_forecast_start, dates_full)
+    if isnothing(cpi_forecast_anchor_idx) || cpi_forecast_anchor_idx < p
+        error("Cannot build CPI counterfactual-baseline forecast from $(cpi_forecast_start)")
+    end
+    cpi_fc = forecast_from(Y_full, A_list, c_vec, cpi_forecast_anchor_idx, H_cpi)
     cpi_fc_dates = [cpi_forecast_start + Month(h - 1) for h in 1:H_cpi]
     cpi_forecast_only = DataFrame(
         date=cpi_fc_dates,
@@ -332,12 +340,12 @@ predicted_for_plot = dropmissing(cpi_plot_df, [:cpi_predicted])
 p_cpi = plot(actual_for_plot.date, actual_for_plot.cpi_actual,
     label="Actual CPI", color=:black, linewidth=2,
     xlabel="Date", ylabel="% YoY",
-    title="CPI YoY: Actual vs $(s.label)-Sample BVAR Prediction (2002-2026)")
+    title="CPI YoY: Actual vs $(s.label)-Sample BVAR Baseline (2002-2026)")
 plot!(p_cpi, predicted_for_plot.date, predicted_for_plot.cpi_predicted,
     label="Predicted CPI", color=:red, linewidth=2)
 if nrow(cpi_forecast_only) > 0
     plot!(p_cpi, cpi_forecast_only.date, cpi_forecast_only.cpi_predicted,
-        label="Recursive forecast after $(s.label)", color=:red, linewidth=2, linestyle=:dash)
+        label="Counterfactual baseline from 2023", color=:red, linewidth=2, linestyle=:dash)
 end
 hline!(p_cpi, [0], color=:gray, linestyle=:dot, alpha=0.5, label="")
 display(p_cpi)

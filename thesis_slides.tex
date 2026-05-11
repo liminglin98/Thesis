@@ -356,7 +356,7 @@ Algebraically, $\lambda \cdot I = W$ which is the weighting matrix used in the c
 
 
 % ═══════════════════════════════════════════════════════════════════════════
-% SLIDE 8 — RESULTS PLACEHOLDER
+% SLIDE 8 — RESULTS 
 % ═══════════════════════════════════════════════════════════════════════════
 \section{Results}
 
@@ -376,14 +376,64 @@ Algebraically, $\lambda \cdot I = W$ which is the weighting matrix used in the c
  
 \begin{frame}{Takeaways}
 \begin{itemize}
-      \item Across all three targeting rules, FR007 and CPI move in the same direction, more aggressive rate cuts achieve lower inflation, consistent with the price puzzle identified in the IRFs. The tradeoff is that stricter CPI targeting comes at the cost of larger NEER swings and greater output volatility relative to more balanced rules.
+      \item Across all three targeting rules, the price puzzle is uniformly present. In the first one with only CPI targeting, a persistent rate cuts compared to the forecast is required to hit the CPI target, but as a result the GDP would be higher than the baseline and the target. With both CPI and GDP targeting, a sustatining rate increased is necessary. As a result, however, the industrial output would suffer a sharp decline. With the addition of exchange rate stability rule, the rate path is similar to the forecast, alongside output and inflation. Still, the interest rate and exchange rate  in all three rules is higher than the reality, which is not something that the government would be happy to see.
       \begin{itemize}
             \item Unfortunately, as mentioned before, since net export, consumption and investment are used in the monthly GDP construction, we did not have it in the reduced form forecast and thus cannot calculate the counterfactual path to analyze the effects on them.
       \end{itemize}
-      \item The reduced-form baseline forecast is notably pessimistic from 2023 onward, likely reflecting the BVAR extrapolating post-COVID deflationary dynamics that may represent a structural break from the estimation sample. While counterfactual paths generally improve on the baseline for both CPI and output, the more relevant comparison is between the counterfactual and the GWR targets, and the persistent gap between the two is the central finding.
+      \item The reduced-form baseline forecast from 2023 onward using data until 2022 actually did a good job in the predicting the GDP growth and the industrial output, while the CPI forecast is much higher than the reality, and this issue is only partially resolved by using the data until 2025, suggesting that the model is not able to capture the structural changes in the economy. 
 \end{itemize}
 \end{frame}
 
+% ═══════════════════════════════════════════════════════════════════════════
+% SLIDE 9 — LIMITATIONS AND EXTENSIONS
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Limitations and Extensions}
+
+\begin{frame}{Limitations and Extensions}
+
+\textbf{1. Fragmented fiscal authority across regions}
+\begin{itemize}\itemsep0.1em
+  \item Caravello et al.\ (2025) show that for the US, the empirics-only
+        counterfactual is close to those produced by models like RANK and HANK.
+  \item This relies on a unified fiscal--monetary stance: the IRFs span the
+        relevant policy frontier because there is one fiscal authority behind
+        them. In China (provinces, LGFVs) and the euro area (member states,
+        NGEU), the IRFs we estimate average over heterogeneous fiscal
+        actors, and the spanning argument is no longer clean.
+\end{itemize}
+
+\textbf{2. Fiscal Regime Changes}
+\begin{itemize}\itemsep0.1em
+  \item Caravello et al.\ assumed fiscal policy fixed along the counterfactual
+        monetary path. In China this is hard to defend: the 2014 budget law
+        reform, LGFV debt swaps, the 2019 VAT cuts, and the 2024 local-government
+        debt resolution all shifted the fiscal stance materially within the sample.
+\end{itemize}
+\end{frame}
+\begin{frame}{Limitations and Extensions (cont'd)}
+\vspace{0.2em}
+\textbf{3. Where I would like to go next.}
+\begin{itemize}\itemsep0.1em
+  \item Both extensions point back to the question that motivated this thesis
+        in the first place: what actually determines the price level
+        when the monetary--fiscal split is non-standard?
+      \vspace{0.3em}\\
+
+\begin{itemize}
+  \item[$\bullet$] \textbf{Monetary--fiscal interaction.}  The central bank takes the fiscal stance as given, the fiscal
+        authority takes the rate path as given, and the price level is
+        determined jointly.
+  \item[$\bullet$] \textbf{Fiscal--fiscal interaction.}  When ``fiscal'' is itself a collection of
+        actors, central vs.\ provincial in China, federal-like vs.\
+        member-states in the euro area, their strategic interaction shapes
+        the aggregate fiscal stance that the central bank then takes as given.
+\end{itemize}
+  \item The euro area is the natural next laboratory: institutionally between
+        the unified US benchmark and the Chinese case, and with the data
+        quality needed to credibly identify the joint monetary--fiscal object.
+\end{itemize}
+
+\end{frame}
 % ═══════════════════════════════════════════════════════════════════════════
 % APPENDIX
 % ═══════════════════════════════════════════════════════════════════════════
