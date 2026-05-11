@@ -6,6 +6,9 @@ Output: romer_china_data.csv
 
 import numpy as np
 import pandas as pd
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import warnings
 import re
@@ -184,8 +187,8 @@ def load_targets(romer_df):
     return romer_df
 
 
-def load_cmpi_monthly():
-    """Build monthly CMPI using the same logic as Data.ipynb, with month aggregation."""
+def load_cmpi_monthly(start_date=None, end_date=None):
+    """Build monthly CMPI as the average trend deviation of policy instruments."""
     cmfile = RAW_DIR / "CMPI.xlsx"
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="Workbook contains no default style*")
@@ -221,6 +224,11 @@ def load_cmpi_monthly():
             prefixed_map = {col: f"{sheet_prefix}_{col}" for col in numeric_cols}
             df = df[["month"] + numeric_cols].rename(columns=prefixed_map)
             df = df.groupby("month", as_index=False).mean(numeric_only=True)
+            component_cols = [prefixed_map[col] for col in numeric_cols]
+            full_months = pd.period_range(df["month"].min(), df["month"].max(), freq="M")
+            df = df.set_index("month").reindex(full_months)
+            df[component_cols] = df[component_cols].ffill()
+            df = df.rename_axis("month").reset_index()
         else:
             df = df[["month"]].drop_duplicates().reset_index(drop=True)
 
@@ -233,17 +241,24 @@ def load_cmpi_monthly():
         lambda left, right: pd.merge(left, right, on="month", how="outer"),
         list(cmpi_dfs.values())
     )
+    cmpi_df = cmpi_df.sort_values("month").reset_index(drop=True)
+
+    start_period = pd.Period(start_date, freq="M") if start_date is not None else cmpi_df["month"].min()
+    end_period = pd.Period(end_date, freq="M") if end_date is not None else cmpi_df["month"].max()
+    full_sample = pd.period_range(start_period, end_period, freq="M")
+    cmpi_df = cmpi_df.set_index("month").reindex(full_sample).ffill().rename_axis("month").reset_index()
 
     numeric_cols = cmpi_df.select_dtypes(include=[np.number]).columns.tolist()
     for col in numeric_cols:
-        mean_val = cmpi_df[col].mean()
-        std_val = cmpi_df[col].std()
+        trend_dev = _trend_deviation(cmpi_df[col])
+        mean_val = trend_dev.mean()
+        std_val = trend_dev.std()
         if pd.notna(std_val) and std_val != 0:
-            cmpi_df[f"{col}_standardized"] = (cmpi_df[col] - mean_val) / std_val
+            cmpi_df[f"{col}_trend_dev_standardized"] = (trend_dev - mean_val) / std_val
         else:
-            cmpi_df[f"{col}_standardized"] = np.nan
+            cmpi_df[f"{col}_trend_dev_standardized"] = np.nan
 
-    standardized_cols = [c for c in cmpi_df.columns if c.endswith("_standardized")]
+    standardized_cols = [c for c in cmpi_df.columns if c.endswith("_trend_dev_standardized")]
     cmpi_df["cmpi"] = cmpi_df[standardized_cols].mean(axis=1)
     cmpi_df["cmpi_n_indicators"] = cmpi_df[standardized_cols].notna().sum(axis=1)
     cmpi_df["date"] = cmpi_df["month"].dt.to_timestamp()
@@ -275,23 +290,22 @@ def save_cmpi_vs_fr007_plot(romer_df):
         print("Warning: CMPI merge produced empty data; skipped CMPI vs FR007 plot")
         return
 
-    for col in ["FR007", "cmpi"]:
-        plot_df[f"{col}_trend_dev"] = _trend_deviation(plot_df[col])
-        std = plot_df[f"{col}_trend_dev"].std(ddof=0)
-        plot_df[f"{col}_trend_dev_z"] = (
-            plot_df[f"{col}_trend_dev"] - plot_df[f"{col}_trend_dev"].mean()
-        ) / (std if std else 1.0)
+    plot_df["FR007_trend_dev"] = _trend_deviation(plot_df["FR007"])
+    std = plot_df["FR007_trend_dev"].std(ddof=0)
+    plot_df["FR007_trend_dev_z"] = (
+        plot_df["FR007_trend_dev"] - plot_df["FR007_trend_dev"].mean()
+    ) / (std if std else 1.0)
 
     fig, ax = plt.subplots(figsize=(10.5, 5.8))
     ax.plot(plot_df["date"], plot_df["FR007_trend_dev_z"], color="tab:blue", lw=1.7, label="FR007 (trend deviation)")
     ax.plot(
         plot_df["date"],
-        plot_df["cmpi_trend_dev_z"],
+        plot_df["cmpi"],
         color="tab:orange",
         lw=1.7,
-        label="CMPI (trend deviation)",
+        label="CMPI",
     )
-    ax.set_title("CMPI vs FR007 (Monthly Deviations from Trend)")
+    ax.set_title("CMPI vs FR007 (Monthly Trend Deviations)")
     ax.set_ylabel("Standardized trend deviation")
     ax.set_xlabel("Date")
     ax.grid(alpha=0.25)
@@ -316,7 +330,9 @@ def main():
     omo_df = load_official_rates()
     cpr_df = load_central_parity()
     ip_df = load_industrial_output()
-    cmpi_df = load_cmpi_monthly()
+    sample_start = gdp_monthly_df["date"].min()
+    sample_end = gdp_monthly_df["date"].max()
+    cmpi_df = load_cmpi_monthly(sample_start, sample_end)
     neer_df = pd.read_csv(
         RAW_DIR / "RBCNBIS_PC1.csv", encoding="gbk", sep=",", header=0, index_col=0, engine="python"
     )
@@ -340,7 +356,6 @@ def main():
     romer_df.to_csv(DERIVED_DIR / "romer_china_data.csv", index=False)
     print(f"Saved: {DERIVED_DIR / 'romer_china_data.csv'}")
 
-    # Save appendix figure used in slides
     save_cmpi_vs_fr007_plot(romer_df)
     return romer_df
 

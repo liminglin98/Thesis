@@ -116,11 +116,10 @@ def map_to_fr007(hfi_core_df):
     """Map HFI events to daily FR007 changes, then aggregate monthly."""
     daily_repo_df = fetch_fr007_daily()
     daily_repo_df["date"] = pd.to_datetime(daily_repo_df["date"])
-    daily_repo_df = daily_repo_df[["date", "FR007"]].copy()
+    daily_repo_df = daily_repo_df[["date", "FR007"]].dropna().sort_values("date").copy()
+    daily_repo_df["FR007_diff"] = daily_repo_df["FR007"].diff()
 
     shock_df = hfi_core_df.merge(daily_repo_df, on="date", how="left")
-    shock_df["FR007_prev"] = shock_df["FR007"].shift(1)
-    shock_df["FR007_diff"] = shock_df["FR007"] - shock_df["FR007_prev"]
     shock_df["shock_policy"] = shock_df["FR007_diff"].where(shock_df["any_policy"] == 1).fillna(0)
     shock_df["shock_policy_change"] = shock_df["FR007_diff"].where(shock_df["any_policy_change"] == 1).fillna(0)
 

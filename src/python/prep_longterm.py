@@ -11,12 +11,12 @@ from fetch_akshare import fetch_m2
 
 
 def load_m2():
-    """M2 money supply with YoY growth."""
+    """M2 money supply with YoY percent growth."""
     m2_df = fetch_m2()
     m2_df["date"] = pd.to_datetime(m2_df["date"])
     m2_df = m2_df[m2_df["date"].dt.year >= 2000]
     m2_df = m2_df.sort_values("date").reset_index(drop=True)
-    m2_df["M2_growth"] = m2_df["M2"] - m2_df["M2"].shift(12)
+    m2_df["M2_growth"] = (m2_df["M2"] / m2_df["M2"].shift(12) - 1) * 100
     return m2_df
 
 

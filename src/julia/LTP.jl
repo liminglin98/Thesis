@@ -223,10 +223,23 @@ end
 # ── Reduced-form residuals ───────────────────────────────────────────────
 residuals = compute_residuals_ltp(Y_full, A_list, c_vec)
 
-# ── Multi-step forecast ─────────────────────────────────────────────────
-H_fc = 24
-fc = forecast_from(Y_full, A_list, c_vec, T_full, H_fc)
-fc_dates = [dates_full[end] + Month(h) for h in 1:H_fc]
+# ── Multi-step forecast / interpolation diagnostic ──────────────────────
+if s.label == "2025"
+    # Full-sample run: compare the model's 2023-2025 recursive path against
+    # realized data inside the sample instead of extrapolating beyond 2025.
+    fc_start = Date(2023, 1, 1)
+    fc_end = Date(2025, 12, 1)
+    fc_start_idx = findfirst(d -> d >= fc_start, dates_full)
+    H_fc = length(fc_start:Month(1):fc_end)
+    fc = forecast_from(Y_full, A_list, c_vec, fc_start_idx - 1, H_fc)
+    fc_dates = [fc_start + Month(h - 1) for h in 1:H_fc]
+    fc_title = "GDP YoY: In-Sample Fit & 2023-2025 Recursive Path ($(s.label))"
+else
+    H_fc = 24
+    fc = forecast_from(Y_full, A_list, c_vec, T_full, H_fc)
+    fc_dates = [dates_full[end] + Month(h) for h in 1:H_fc]
+    fc_title = "GDP YoY: In-Sample Fit & $(H_fc)-Month Forecast ($(s.label))"
+end
 
 # ── Plots ────────────────────────────────────────────────────────────────
 ##
@@ -263,7 +276,7 @@ gdp_idx = 1
 p_gdp = plot(dates_est, Y_dep[:, gdp_idx],
     label="Actual", color=:black, linewidth=1.5,
     xlabel="Date", ylabel="% YoY",
-    title="GDP YoY: In-Sample Fit & $(H_fc)-Month Forecast ($(s.label))")
+    title=fc_title)
 plot!(p_gdp, dates_est, X * B_post[:, gdp_idx],
     label="Fitted (BVAR)", color=:blue, linestyle=:dash, linewidth=1.5)
 actual_fc = dropmissing(df_raw, [:date, :realgdp_monthly_yoy])
@@ -279,6 +292,56 @@ plot!(p_gdp, fc_dates, fc[:, gdp_idx],
 hline!([0], color=:gray, linestyle=:dot, alpha=0.5, label="")
 display(p_gdp)
 savefig(p_gdp, joinpath(DIAG_DIR, "bvar_gdp_forecast.png"))
+
+cpi_idx = 3
+cpi_forecast_start = s.end_date + Month(1)
+cpi_forecast_end = maximum(df_raw.date)
+H_cpi = max(0, length(cpi_forecast_start:Month(1):cpi_forecast_end))
+cpi_fitted = X * B_post[:, cpi_idx]
+cpi_plot_start = Date(2002, 1, 1)
+actual_cpi = dropmissing(df_raw, [:date, :cpi])
+actual_cpi = filter(r -> r.date >= cpi_plot_start && r.date <= cpi_forecast_end, actual_cpi)
+
+cpi_pred_parts = [DataFrame(date=dates_est, cpi_predicted=cpi_fitted)]
+cpi_forecast_only = DataFrame(date=Date[], cpi_predicted=Float64[])
+if H_cpi > 0
+    cpi_fc = forecast_from(Y_full, A_list, c_vec, T_full, H_cpi)
+    cpi_fc_dates = [cpi_forecast_start + Month(h - 1) for h in 1:H_cpi]
+    cpi_forecast_only = DataFrame(
+        date=cpi_fc_dates,
+        cpi_predicted=cpi_fc[:, cpi_idx],
+    )
+    push!(cpi_pred_parts, cpi_forecast_only)
+end
+cpi_pred_df = vcat(cpi_pred_parts...)
+cpi_pred_df = filter(r -> r.date >= cpi_plot_start && r.date <= cpi_forecast_end, cpi_pred_df)
+
+cpi_plot_df = leftjoin(
+    DataFrame(date=sort(unique(vcat(actual_cpi.date, cpi_pred_df.date)))),
+    actual_cpi[:, [:date, :cpi]],
+    on=:date,
+)
+cpi_plot_df = leftjoin(cpi_plot_df, cpi_pred_df, on=:date)
+rename!(cpi_plot_df, :cpi => :cpi_actual)
+sort!(cpi_plot_df, :date)
+CSV.write(joinpath(DIAG_DIR, "cpi_forecast_vs_actual_until_2026.csv"), cpi_plot_df)
+
+actual_for_plot = dropmissing(cpi_plot_df, [:cpi_actual])
+predicted_for_plot = dropmissing(cpi_plot_df, [:cpi_predicted])
+
+p_cpi = plot(actual_for_plot.date, actual_for_plot.cpi_actual,
+    label="Actual CPI", color=:black, linewidth=2,
+    xlabel="Date", ylabel="% YoY",
+    title="CPI YoY: Actual vs $(s.label)-Sample BVAR Prediction (2002-2026)")
+plot!(p_cpi, predicted_for_plot.date, predicted_for_plot.cpi_predicted,
+    label="Predicted CPI", color=:red, linewidth=2)
+if nrow(cpi_forecast_only) > 0
+    plot!(p_cpi, cpi_forecast_only.date, cpi_forecast_only.cpi_predicted,
+        label="Recursive forecast after $(s.label)", color=:red, linewidth=2, linestyle=:dash)
+end
+hline!(p_cpi, [0], color=:gray, linestyle=:dot, alpha=0.5, label="")
+display(p_cpi)
+savefig(p_cpi, joinpath(DIAG_DIR, "cpi_forecast_vs_actual_until_2026.png"))
 ##
 # ── Save results ─────────────────────────────────────────────────────────
 results = Dict(

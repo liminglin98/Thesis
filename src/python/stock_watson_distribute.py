@@ -363,14 +363,6 @@ def prepare_and_run(df: pd.DataFrame, break_year: int = None) -> pd.DataFrame:
 
     indicator_cols = ["current consumption", "proxy_fai", "gov_spend_current", "trade balance"]
 
-    # Convert trade balance from USD to RMB if spot rate available
-    if "CNYUSDSpot" in df.columns:
-        mask = df["trade balance"].notna() & df["CNYUSDSpot"].notna()
-        df.loc[mask, "trade balance"] = (
-            df.loc[mask, "trade balance"].astype(float)
-            * df.loc[mask, "CNYUSDSpot"].astype(float)
-        )
-
     # Ensure numeric
     for c in indicator_cols:
         df[c] = pd.to_numeric(df[c], errors="coerce")

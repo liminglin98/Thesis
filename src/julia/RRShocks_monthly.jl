@@ -29,7 +29,7 @@ df_raw.after2006 = coalesce.(df_raw.date .>= Date(2006, 1, 1), false)
 df_raw.dCNYUSDCPR = df_raw.CNYUSDCPR .- lag(df_raw.CNYUSDCPR, 1)
 df_raw.fx_gap = df_raw.dCNYUSDCPR .* df_raw.after2006 .* (df_raw.CNYUSDSpot .- df_raw.CNYUSDCPR)
 
-df_raw.FR007_l1   = lag(df_raw.FR007, 1)
+df_raw.cmpi_l1    = lag(df_raw.cmpi, 1)
 df_raw.cpi_gap_l1 = lag(df_raw.cpi_gap, 1)
 df_raw.gap_pos_l1 = lag(df_raw.gap_pos, 1)
 df_raw.gap_neg_l1 = lag(df_raw.gap_neg, 1)
@@ -64,18 +64,18 @@ df = filter(r -> !ismissing(r.date) && r.date >= s.start_date && r.date <= s.end
 # =========================
 # 1) Policy rule regression
 # =========================
-cols = [:FR007, :FR007_l1, :cpi_gap_l1, :gap_pos_l1, :gap_neg_l1, :fx_gap_l1]
+cols = [:cmpi, :cmpi_l1, :cpi_gap_l1, :gap_pos_l1, :gap_neg_l1, :fx_gap_l1]
 complete = completecases(df[:, cols])
 
-model1 = lm(@formula(FR007 ~ FR007_l1 + cpi_gap_l1 + gap_pos_l1 + gap_neg_l1 + fx_gap_l1), df[complete, :])
+model1 = lm(@formula(cmpi ~ cmpi_l1 + cpi_gap_l1 + gap_pos_l1 + gap_neg_l1 + fx_gap_l1), df[complete, :])
 
-df.pred_FR007 = Vector{Union{Missing, Float64}}(missing, nrow(df))
+df.pred_cmpi = Vector{Union{Missing, Float64}}(missing, nrow(df))
 df.policy_residual  = Vector{Union{Missing, Float64}}(missing, nrow(df))
-df.pred_FR007[complete] = predict(model1)
+df.pred_cmpi[complete] = predict(model1)
 df.policy_residual[complete]  = GLM.residuals(model1)
 
 println("\n=== Model (full sample $(s.label)) ===")
-println(model1)
+println(coeftable(model1))
 
 # =========================
 # 2) Policy-rule fit plots (full sample only)
@@ -84,21 +84,21 @@ if !is_segment
     p_res = plot(df.date, df.policy_residual,
         label="Residual", legend=:topleft,
         xlabel="Date", ylabel="Residual",
-        title="FR007 Residuals ($(s.label))",
+        title="CMPI Residuals ($(s.label))",
         color=:blue, alpha=0.8)
     hline!([0.0], linestyle=:dot, color=:black, alpha=0.5, label="")
     display(p_res)
-    savefig(p_res, joinpath(fit_out_dir, "FR007_residuals_comparison.png"))
+    savefig(p_res, joinpath(fit_out_dir, "cmpi_residuals_comparison.png"))
 
-    p_fit = plot(df.date, df.FR007,
-        label="Actual FR007", legend=:topleft,
-        xlabel="Date", ylabel="FR007",
-        title="Actual vs Predicted FR007 ($(s.label))",
+    p_fit = plot(df.date, df.cmpi,
+        label="Actual CMPI", legend=:topleft,
+        xlabel="Date", ylabel="CMPI",
+        title="Actual vs Predicted CMPI ($(s.label))",
         color=:black)
-    plot!(p_fit, df.date, df.pred_FR007,
+    plot!(p_fit, df.date, df.pred_cmpi,
         label="Predicted", color=:blue, linestyle=:dash)
     display(p_fit)
-    savefig(p_fit, joinpath(fit_out_dir, "FR007_fit_comparison.png"))
+    savefig(p_fit, joinpath(fit_out_dir, "cmpi_fit_comparison.png"))
 else
     println("Segment mode: skipping policy-rule fit plots; generating IRFs only.")
 end
@@ -107,7 +107,7 @@ end
 # 3) BVAR with Minnesota Priors + IV-SVAR Identification
 # ============================================================================
 
-var_syms = [:realgdp_monthly_yoy, :cpi, :FR007, :neer_yoy, :IP_yoy]
+var_syms = [:realgdp_monthly_yoy, :cpi, :cmpi, :neer_yoy, :IP_yoy]
 all_syms = vcat(var_syms, [:policy_residual])
 
 df_bvar = dropmissing(df, all_syms)
@@ -122,9 +122,9 @@ p = 6
 H = 24
 
 gdp_col    = findfirst(==(:realgdp_monthly_yoy), var_syms)
-policy_col = findfirst(==(:FR007), var_syms)
+policy_col = findfirst(==(:cmpi), var_syms)
 
-var_labels = ["Real GDP Growth", "CPI", "FR007", "Real Effective Exchange Rate", "Industrial Value Added"]
+var_labels = ["Real GDP Growth", "CPI", "CMPI", "Real Effective Exchange Rate", "Industrial Value Added"]
 
 Teff = T_raw - p
 Y_dep = Y_full[p+1:end, :]
@@ -264,7 +264,7 @@ end
 
 # IRF table
 println("\n" * "="^60)
-println("BVAR + IV-SVAR: Contractionary MP Shock (+1 pp FR007) [$(s.label)]")
+println("BVAR + IV-SVAR: Contractionary MP Shock (+1 CMPI) [$(s.label)]")
 println("="^60)
 
 for j in 1:n
@@ -301,7 +301,7 @@ n_rows = ceil(Int, n / n_cols)
 plot_bvar = plot(p_plots...,
     layout = (n_rows, n_cols),
     size = (380 * n_cols, 300 * n_rows),
-    plot_title = "BVAR + IV-SVAR: +1 pp FR007 shock — RR instrument ($(s.label))")
+    plot_title = "BVAR + IV-SVAR: +1 CMPI shock — narrative instrument ($(s.label))")
 display(plot_bvar)
 savefig(plot_bvar, joinpath(irf_out_dir, "irf_bvar_iv_svar.png"))
 

@@ -55,9 +55,10 @@ def load_trade():
     spot_df["date"] = spot_df["date"].dt.to_timestamp()
 
     df = df.merge(spot_df[["date", "CNYUSDSpot"]], on="date", how="left")
+    # Raw trade balance is USD thousands. Convert to RMB yi (100 million RMB).
     df["trade balance"] = (
         pd.to_numeric(df["trade balance"], errors="coerce")
-        * df["CNYUSDSpot"] / 1_000_000
+        * df["CNYUSDSpot"] / 100_000
     )
     df = df.drop(columns=["CNYUSDSpot"])
     return df, spot_df
