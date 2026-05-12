@@ -8,106 +8,223 @@
 \usepackage{hyperref}
 \usepackage{natbib} % Using natbib for standard author-year citations
 \usepackage{booktabs} % For nicer tables
+\usepackage{CJKutf8} % For inline Chinese characters
 
 % Margins
-\geometry{left=2.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm}
+\geometry{left=1in, right=1in, top=1in, bottom=1in}
 
 % Line spacing
 \onehalfspacing
 
 % Title Information
-\title{\textbf{Rule-Based Monetary Policy in China: \\ A Semi-Structural Counterfactual Analysis}}
-\author{Liming Lin}
-\date{\today}
+\title{\textbf{Rule-Based Monetary Policy in China: \\ An Empirics-Only Counterfactual Analysis}}
+\author{Liming Lin\thanks{Sciences Po Paris. Supervisor: Paul Bouscasse. Jury: Paul Bouscasse, Axelle Ferri\`ere. I am grateful to \dots\ All errors are my own.}}
+\date{May 2026}
 
 \begin{document}
 
 \maketitle
 
 \begin{abstract}
-This proposal outlines a research project aimed at quantifying the effects of rule-based monetary policy in China using a semi-structural approach. Specifically, it investigates how the trajectory of the Chinese economy (Industrial Output, CPI, and PPI) would have differed had the People's Bank of China (PBoC) adhered to a strict target instead of its historical discretionary framework. The study utilizes High-Frequency Identification (HFI) and a modified Romer \& Romer approach to recover structural shocks and simulates counterfactuals for the late-Covid period.
+\noindent Since 2023, Chinese CPI inflation has hovered near zero, persistently undershooting the targets set in the annual Government Work Report. This paper applies the empirics-only counterfactual framework of Caravello, McKay and Wolf (2025) to ask what would have happened to Chinese inflation, output, and the exchange rate if the People's Bank of China had instead followed an explicit targeting rule over this period. Two sets of impulse response functions to monetary policy shocks --- one identified from a narrative policy-rule residual on the 7-day repo rate (FR007), the other from high-frequency FR007 surprises on policy event dates --- are combined with a 7-variable Bayesian VAR baseline projection in a stacked least-squares solver to recover the shock sequence that best implements alternative targeting rules. The headline finding is a persistent gap between counterfactual paths and the Government Work Report CPI targets, even under aggressive strict targeting, suggesting that conventional interest rate policy alone could not have closed the realized inflation gap. The result is robust to flexible targeting that includes output and exchange-rate stabilization objectives, and to extending the estimation sample to 2025. A secondary finding --- a positive short-run CPI response to a contractionary FR007 shock that appears in both identification schemes --- is interpreted as a substantive feature of China's CPI methodology, in which floating-rate mortgage interest enters the housing sub-index, rather than as a model deficiency.
+\vspace{0.5em}\\
+\noindent \textbf{Keywords:} monetary policy, counterfactuals, China, inflation targeting, sufficient statistics. \\
+\textbf{JEL codes:} E52, E58, E31.
 \end{abstract}
 
-\section{Background and Motivation}
+\section{Introduction}
 
-China's economy is currently navigating a significant deflationary cycle. Since the second quarter of 2023, Consumer Price Index (CPI) growth has stagnated near zero, while the Producer Price Index (PPI) has remained in negative territory since late 2022. This price instability coincides with severe liquidity stress in the real estate sector,  exemplified by bankruptcy and dangers of default among major developers such as Evergrande and Country Garden and elevated local government debt risks.
+Since 2023, Chinese CPI inflation has hovered near zero, persistently undershooting the official targets set in the annual Government Work Report (GWR). The GWR CPI targets for 2023, 2024, and 2025 were 3\%, 3\%, and roughly 2\%, respectively; realized year-on-year CPI growth over the same period averaged close to zero. Producer prices have remained in negative territory since late 2022, and the deflationary stance has coincided with severe liquidity stress in the real estate sector --- exemplified by the bankruptcies and near-defaults of major developers such as Evergrande and Country Garden --- and with elevated local government financing-vehicle (LGFV) debt risks.
 
-Despite the deflationary pressures and looming risks in the financial sector, the People's Bank of China (PBoC) has maintained a cautious, discretionary policy stance. For example, The Loan Prime Rate (LPR), which is the new policy rate set for loans, was lowered only moderately from 3.65\% in 2022 to approximately 3.0\% recently, a pace arguably insufficient to arrest the deflationary spiral. Meanwhile, although the targets for output growth remained achivable, that for CPI, which was set to 3\% for past few years, was consistently missed.
+Despite these pressures, the People's Bank of China (PBoC) has maintained a cautious, gradualist stance. The Loan Prime Rate (LPR), now the principal anchor for new loan pricing, has been lowered only moderately, from 3.65\% in 2022 to roughly 3.0\% in early 2026, a pace that has been widely viewed as insufficient to arrest the deflationary spiral.\footnote{See, for example, the discussion of monetary policy options in the IMF's Article IV consultations with China for 2024 and 2025.} The 2024 Central Economic Work Conference (CEWC) introduced for the first time the formulation of ``a reasonable rebound in the price level'' (\textit{wujia heli huisheng}, \begin{CJK}{UTF8}{gbsn}物价合理回升\end{CJK}); the 2025 CEWC explicitly tied this objective to the conduct of monetary policy. These developments raise a fundamental question about the recent past: was the discretionary failure to meet the inflation target a result of structural constraints on monetary policy in China, or was it primarily a policy choice? Equivalently, what would the trajectory of Chinese CPI, output, and the exchange rate have looked like over 2023--2025 if the PBoC had instead followed an explicit, rule-based targeting policy?
 
-The recent lowering of the 2025 inflation target to roughly 2\%, alongside the Central Economic Work Conference's explicit new goal for monetary policy to ``promote economic growth and rebound the price level by a reasonable amount'' (\textit{wu jia he li hui sheng}), signals a potential regime shift. 
-\section{Research Question}
+\paragraph{Approach.} This paper answers that question by applying the empirics-only counterfactual framework of \citet{wolf2025} to China.\footnote{Throughout the paper I refer to \citet{wolf2025} as ``CMW2025'' and to the foundational result in \citet{mckay2023} as ``MW2023''.} The approach builds on the sufficient-statistics insight of \citet{mckay2023} and \citet{barnichon2023}: under weak structural assumptions, evaluating macroeconomic outcomes under alternative monetary policy rules requires only two empirically estimable objects --- a reduced-form baseline projection of the economy and the causal impulse-response functions (IRFs) of macro variables to monetary policy shocks. CMW2025 show that, when the contemplated counterfactual involves changes to the short end of the yield curve, these objects can be taken directly from the data, sidestepping the need for a fully specified structural model. The framework is therefore well-suited to settings where the underlying structure is poorly known --- arguably the case for China, where multi-instrument policy, dual-track interest rates, and tight monetary--fiscal coordination complicate any DSGE-style identification of mechanisms.
 
-This context creates a critical question to investigate: Was the ``discretionary'' failure to meet targets a result of structural constraints, or simply a policy choice? Specifically, we aim to analyze the counterfactual the trajectory of the Chinese economy in the late-Covid period (2022-2025), including indexes like GDP, CPI, PPI, and the USD/CNY exchange rate if the PBoC had adhered to a strict, rule-based monetary policy (for instance an explicit 2\% Inflation Target or a Nominal GDP Target) instead of its historical discretionary approach
+The empirical implementation proceeds in four blocks, in the spirit of the CMW2025 application to U.S.\ post-COVID inflation. First, a 7-variable Bayesian VAR with Minnesota prior, estimated on monthly data from 2002 onward, produces a baseline projection of the Chinese economy from a chosen forecast date. Second, narrative monetary policy shocks are identified as the residual of a forward-looking policy rule for FR007 that combines elements from \citet{chen2025} (asymmetric output gap, lagged interest rate) and \citet{rey2026} (post-2006 exchange-rate gap term). Third, high-frequency shocks are constructed as daily close-to-close FR007 changes on dates of PBoC announcements that involve a change in one of the core policy instruments --- 7-day reverse repo, 1-year MLF, 1-year LPR, RRR for large financial institutions, and pre-2015 benchmark deposit/lending rates --- and aggregated to monthly frequency. Fourth, the shock sequence that minimizes a weighted quadratic loss over CPI deviations from the GWR target, output deviations from the GWR growth target, FR007 first differences (a smoothness penalty), and policy-induced deviations of the nominal effective exchange rate from baseline is recovered from a stacked-OLS problem in which both narrative and HFI transmission maps enter as columns of the policy-shock causal-effect matrix.
 
-\section{Methodology}
+\paragraph{Findings.} Three results emerge.
 
-\subsection{The Semi-Structural Approach}
-We employ the semi-structural methodology developed by \cite{mckay2023}. This approach bridges the gap between reduced-form empirics and structural theory. Instead of building a fully specified DSGE model, which is prone to misspecification regarding China's complex micro-frictions, we rely on two sufficient statistics to simulate the economy under alternative policy rules:
-\begin{enumerate}
-    \item A baseline projection model caputuring the fundamentals and also the shocks (although not identified) of the economy.
-    \item The causal effects of monetary policy shocks on the macroeconomic variables, representing in Impulse Response Functions (IRFs).
-\end{enumerate}
+First, even under strict CPI targeting --- in which the loss function places weight only on the inflation gap and an interest-rate smoothness penalty --- the counterfactual CPI path remains substantially below the GWR targets throughout 2023--2025. Adding flexible targeting motives (output stabilization, exchange-rate stability) tightens the gap further. The relevant comparison here is between counterfactual CPI and the GWR target, not between counterfactual and baseline: the BVAR baseline is itself notably pessimistic from 2023 onward, likely because the model extrapolates post-COVID deflationary dynamics that may represent a structural break from the estimation sample. The persistent gap between the counterfactual and the announced target is the central finding.
 
-\subsection{Key Assumptions}
-\begin{itemize}
-    \item \textbf{Linearity:} We assume the economy's response to shocks is linear (scale and state invariant). While \cite{chen2025} model regime-switching in the policy rule itself, standard empirical literature (e.g., \cite{das2022}) supports using linear IRFs for aggregate variables (Industrial Output, CPI) as a robust first-order approximation.
-    \item \textbf{Information Symmetry (and its Violation):} A key assumption in the method developed by \cite{mckay2023} is that policy shocks are ``pure'' and do not convey private information about the economic outlook. In China, this assumption is likely violated for two reasons. First, the general public—including the private sector and research institutions—has limited access to government data compared to the authorities, creating significant information asymmetry. Second, the institutional coordination between monetary and fiscal policy means monetary actions often signal broader fiscal stances or official growth outlooks \citep{das2022}. As a result, monetary policy decisions may come with a strong ``information effect,'' causing the transmission to behave differently than expected. For the purpose of this proposal, we will proceed under the full information assumption, but we intend to estimate more robust shock series with alternative identification strategies (such as the advanced HFI methods in \cite{he2024}) in future work to alleviate this limitation as even the shocks themsevels maybe identified but the effects are difficult to disentangled.
-    \item \textbf{Single Policy Instrument:} Although \cite{mckay2023} did not explicitly state this, but the method relies on that the two casual effects IRFs are derived for the same policy instrument, which is the federal funds effective rate. However, in China, the PBoC targeted both the qantity of money (via Reserve Requirement Ratio, RRR) and the price of money (via 7-day repo rate, R007) simultaneously. Only in recent years has the PBoC shifted more towards the interest rate-based policy framework. For now, we will start with measuring the effects of R007-based shocks (which \cite{chen2025} also did for the 2000-2018 period). However, if the results are not robust, we may shift the focus to the RRR-based shocks (as in \cite{chen2018}) and evaluate the policy counterfactuals during the stock market crisis (2015-2016).
-\end{itemize}
+Second, the counterfactual reveals a clear policy trade-off. Across all targeting rules considered, more aggressive rate cuts achieve lower (more negative) counterfactual inflation deviations, consistent with a price-puzzle pattern in the underlying IRFs (see below); the cost is larger NEER swings and greater output volatility relative to more balanced rules.
 
-\subsection{Baseline Projection}
-The original work by \cite{mckay2023} used a 10-variable system for estimating the baseline projection using reduced-form VAR in the U.S. context, including variables like unemployment, output gap, investment, consumption, working hours, Utilization-adjusted TFP, labor productivity, labor share and inflation. However, in the China context, many of these variables are not available or reliable and also there are some other indexes specific to China. The following is the list adjusted to fit China's economy, dual-track price system:
-\begin{enumerate}
-    \item \textbf{GDP:} The Nomial GDP data by \cite{chen2024} to avoid the over-smoothiness in the official data (China Cyclical Activity Tracker (CCAT) \cite{fernald2021} for robustness checks).
-    \item \textbf{Consumer Prices:} CPI Inflation (YoY).
-    \item \textbf{Producer Prices:} PPI Inflation (YoY).
-    \item \textbf{Policy Instrument:} 7-Day Repo Rate (R007).
-    \item \textbf{External Constraint:} CNY/USD Exchange Rate (Capturing ``Impossible Trinity'' constraints).
-    \item \textbf{Financial Friction:} Corporate Bond Spread (e.g., AA-AAA spread or LGFV spread).
-\end{enumerate}
+Third, both identification schemes deliver an initial \emph{positive} CPI response to a contractionary FR007 shock --- a price puzzle. Rather than treating this as a deficiency to be patched away (e.g., by adding commodity-price controls or sign restrictions), I follow \citet{chodorow2025} in interpreting it as a substantive feature of Chinese CPI methodology. The Chinese CPI's housing sub-index (\begin{CJK}{UTF8}{gbsn}居住类\end{CJK}) employs a user-cost approach that includes mortgage interest payments; with the bulk of Chinese mortgages on floating rates pegged to the LPR, an upward FR007 shock that propagates to the LPR mechanically raises the housing sub-index in the short run. The puzzle is therefore informative about the housing channel of monetary transmission, not a sign that the shocks are misidentified.
 
-\subsection{Casual Effects of Monetary Policy series 1: High-Frequency Identification (HFI)}
-To obtain the causal IRFs of monetary policy shocks, we need to identify the shocks. The first approach we employ is similar to the HFI series constructed by \cite{das2022}:
-\begin{itemize}
-    \item \textbf{Instrument:} 7-day Repo Rate (R007) changes on PBoC policy announcement days instead of the 1-year Interest Rate Swaps (IRS) in order to unify the policy instrument with the baseline projection model and the Romer \& Romer shock which will be discussed later.
-    \item \textbf{Event Window:} [-1, +1] days around major policy announcements (including policy interest rate changes, RRR changes, open market operations, foreign exchange rate regime reform, release of quarterly China Monetary Policy Reports (PBoC), annual Reports on the Work of the Government (State Council), annual speeches by the Chairman on the Central Economic Work Conference). In addition, we am considering include policy leaks prior to the announcement by the foreign media (e.g., Reuters, Bloomberg and WSJ). If data allows, we will also test a more narrower window of half day before and after the announcement. 
-\end{itemize}
-An Alternative approach for HFI is proposed by \cite{bu2021} and later adopted by \cite{he2024} to the China context. This method improves identification by first estimating the sensitivity of the entire yield curve (swaps and bonds) to policy events, and then using these sensitivities to filter daily rate changes. This process extracts a single latent shock series that isolates the common policy signal from idiosyncratic market noise more effectively than single-instrument proxies.
-\subsection{Casual Effects of Monetary Policy series 2: Romer \& Romer Shocks}
-Another way to recover the historical monetary policy shocks ($\epsilon_{R,t}$), we estimate a ``China-version'' of the Romer and Romer shock (\cite{romer2004}), modifying by reaction function from \cite{chen2025}, which 1. dropped the use of internal forecasts (which is not publicly available in China) and 2. have not yet included the narrative component extracting from the official documenets. The estimated Rule is as follows: 
-\begin{equation}
-    R_t = \alpha + \gamma_R R_{t-1} + \gamma_{\pi}(\pi_t - \pi^*) + \gamma_{x,t}(y_{x,t} - y^*) + \epsilon_{R,t}
-\end{equation}
-$R_t$ is the 7-day repo rate (R007), $\pi_t$ is the quarterly YoY CPI, and the $y_{x,t}$ is the quarterly YoY real GDP grwoth rate while $y^*$ is the corresponding annual grwoth rate target set in the annual Report on the Work on the Government. The residual $\epsilon_{R,t}$ represents the monetary policy shocks. 
-We also caputure the assymetric reponse to the output gap similar to \cite{chen2025} as follows:
-\begin{equation}
-\gamma_{x, t}=\left\{\begin{array}{ll}
-\gamma_{x, a} & \text { if } g_{x, t} \geq g_{x, t}^* \\
-\gamma_{x, b} & \text { if } g_{x, t}<g_{x, t}^*
-\end{array},\right.
-\end{equation}
-Unlike \cite{chen2025}, who use quarterly data and a fixed target on CPI (annual 3.5\% and 0.85\% quarterly) , we use quarterly YoY data and include the targets set each set($\pi^*$) to match the changes in policy stance. Also, their work allows for the state-dependent heteroskedasticity in the policy but this paper does not incorporate this for now, which might complicate the linearity assumption.
+\paragraph{Contributions.} This paper makes three contributions.
 
-\subsection{The Rest of the Procedure}
-Once the  monetary policy shocks are identified, the analysis proceeds in two stages. First, we will estimate the dynamic causal effects of these shocks on the key macroeconomic variables to obtain the Impulse Response Functions (IRFs) using VAR. These IRFs serve as the "sufficient statistics" capturing the economy's transmission mechanism. Second, utilizing the algorithm from McKay and Wolf (2023), we will construct the counterfactual projections. This involves solving for the specific sequence of interest rate changes that would have been required to satisfy the alternative strict targeting rule (e.g., maintaining a 2\% inflation target) at every point in time, holding the historical sequence of non-monetary shocks fixed. By comparing the counterfactual projections to the actual outcomes, especially CPI, GDP, and exchange rate, we can see how the PBoC were trading off between those indexes.
+\textit{First}, it is, to my knowledge, the first application of the empirics-only counterfactual framework of \citet{wolf2025} to a non-U.S., emerging-market context.\footnote{\citet{bouscasse2024} apply the related sufficient-statistics framework of \citet{mckay2023} to fiscal counterfactuals in the U.S. post-COVID inflation episode; the present paper is closer in spirit to that exercise than to the original U.S.\ monetary applications in CMW2025.} The application is non-trivial: the framework was originally designed around the federal funds rate as a single, well-identified policy instrument, while the PBoC operates a multi-instrument framework with dual-track rates. The paper takes a clear stand on this issue by selecting FR007 --- the market rate that anchors HFI surprises and that \citet{chen2025} use as the dependent variable in their policy rule --- as the unifying instrument across all four building blocks.
 
-\section{Some Preliminary Results}
-We have successfully replicate the shocks identification designed by \cite{chen2025} for the 2001-2023 period. Noted that in 2020 the government did not set an explicit GDP growth target among the uncertainties brought by COVID-19 pandemic, so we set the target to be 6\%, which fit the trend but may affect the estimation. The estimated monetary policy rule is plotted in Figure \ref{fig:romer_romer_shock}.
+\textit{Second}, the paper combines two distinct shock-identification schemes within a single counterfactual exercise. Following the CMW2025 logic, both narrative and HFI shocks enter as columns of the transmission map, allowing the solver to choose a mixture rather than treating one as primary and the other as robustness. This is more demanding than the standard practice in the China monetary-policy literature, where a single shock series is typically estimated and compared across alternatives.
 
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=1\textwidth]{Data/Monetary Policy Rule_Chen.png}
-    \caption{Estimated Monetary Policy Rules for China (2001-2023)}
-    \label{fig:romer_romer_shock}
-\end{figure}
+\textit{Third}, the paper documents and rationalizes a robust price puzzle in Chinese CPI responses to monetary policy shocks. The interpretation through the housing user-cost channel, building on \citet{chodorow2025}, has implications for the design of future inflation-targeting frameworks in China and for the cross-country literature on monetary transmission to housing.
 
-From the figure, we notice that the shocks (the difference between the actual and fitted lines) shows some patterns. Specifically, the fitted line is often a right-shift of the actual line. This phenomennon can be attributed to 1. the autocorrelation among the variables which can be expected from the lag term and 2.the fact that PBoC might react to the market faster or even preemptively. To investigate this further, we re-estimate the rule without the lagged dependent variable. Although the "right-shift" disappears, the result is not be econometrically sound as the errors terms are not dealt with properly. The results are plotted in Figure \ref{fig:romer_romer_shock_static}.
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=1\textwidth]{Data/Monetary Policy Rule_Static.png}
-    \caption{Estimated Monetary Policy Rules for China (No Lagged Dependent Variable)}
-    \label{fig:romer_romer_shock_static}
-\end{figure}
+\paragraph{Roadmap.} Section \ref{sec:litreview} reviews the related literature on monetary policy identification in China, on counterfactual policy evaluation methods, and on the recent Chinese deflationary episode. Section \ref{sec:institutional} provides institutional background on the PBoC's policy framework and on the Government Work Report target system. Section \ref{sec:framework} sets out the empirical framework, including the BVAR baseline projection, the two shock-identification schemes, and the counterfactual solver. Section \ref{sec:data} describes the data. Section \ref{sec:irf} presents the estimated impulse responses and discusses the price puzzle. Section \ref{sec:counterfactual} reports the main counterfactual results. Section \ref{sec:discussion} discusses limitations and avenues for future research. Section \ref{sec:conclusion} concludes.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Related Literature}\label{sec:litreview}
+% ═══════════════════════════════════════════════════════════════════════════
+
+This paper sits at the intersection of three literatures.
+
+\subsection{Monetary policy identification in China}
+
+% [TO WRITE: ~1 page, organized as two sub-traditions]
+% Sub-tradition 1: narrative / policy-rule residual approaches.
+%   - Chen, Ren & Zha (2018): shadow banking, asymmetric rule on M2 growth.
+%   - Chen, Xiao & Zha (2025): updated rule on FR007, regime-switching, systemic risk.
+%   - Miranda-Agrippino, Nenova & Rey (2026, "MANR2026"): CMPI as the LHS,
+%     forward-looking lag terms, exchange-rate gap.
+%   - Position: this paper combines the FR007 dependent variable from CXZ2025
+%     with the FX gap and forward-looking lag structure from MANR2026.
+% Sub-tradition 2: high-frequency identification.
+%   - Das & Song (2022) IMF WP: 1-year IRS surprises around policy events;
+%     also introduces a text-based monetary-fiscal coordination measure.
+%   - He, Jia, Li & Wu (2024): Chinese adaptation of Bu, Rogers & Wu (2021)
+%     yield-curve filtering approach.
+%   - Bu, Rogers & Wu (2021) for the underlying U.S.\ method.
+%   - Position: this paper uses FR007 (not IRS, due to data access constraints)
+%     and restricts to rate-change-only event dates.
+
+\subsection{Counterfactual monetary policy evaluation}
+
+% [TO WRITE: ~3/4 page]
+% Standard structural tradition: Smets-Wouters (2007); Bocola, Dovis,
+% Fella & Roldan-Blanco (2024) on U.S.\ post-COVID; mention Lucas (1976).
+% Sufficient-statistics revolution: McKay & Wolf (2023, Econometrica);
+% Barnichon & Mesters (2023). Identification via causal effects of policy
+% shocks rather than full structural model.
+% Hybrid empirics-only: Caravello, McKay & Wolf (2025). Key insight: when
+% counterfactual involves only short-end changes, empirical IRFs alone suffice;
+% structural extrapolation only needed for the long end of the yield curve.
+% Recent applications: Bouscasse & Hu (2024) on fiscal counterfactuals.
+% Position: first emerging-market application of the CMW2025 empirics-only
+% approach; methodologically aligned with the post-COVID U.S.\ exercise.
+
+\subsection{The price puzzle, housing channels, and Chinese CPI}
+
+% [TO WRITE: ~3/4 page]
+% Empirical price puzzle in monetary VARs (Sims 1992; Christiano-Eichenbaum-Evans 1999;
+% Castelnuovo-Surico 2010 review) --- usually attributed to omitted variables
+% (commodity prices) or imperfect identification.
+% Chodorow-Reich (2025, "Housing in the CPI"): user-cost vs. OER methodologies
+% for CPI housing components; implications for short-run CPI response to
+% monetary policy.
+% China-specific: NBS uses a user-cost approach for owner-occupied housing
+% (居住类 sub-index includes mortgage interest), unlike the U.S.\ OER method.
+% Combined with floating-rate mortgages anchored to the LPR, this generates
+% a mechanical short-run positive CPI response to contractionary policy.
+% Position: this paper interprets the price puzzle as a feature of CPI
+% measurement rather than a sign of misidentification --- aligning with
+% Chodorow-Reich's framework.
+% (Optional sub-thread for fiscal-monetary coordination / information effects:
+%   Das & Song (2022) text-based measure; Bauer-Swanson (2023) on news vs. shocks;
+%   Nakamura-Steinsson (2018), Jarocinski-Karadi (2020) on information effects;
+%   Barthelemy-Mengus-Plantin (2024) on fiscal dominance --- mentioned briefly
+%   as motivation for future work in §8.)
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Institutional Background}\label{sec:institutional}
+% ═══════════════════════════════════════════════════════════════════════════
+
+% [TO WRITE: ~1-1.5 pages]
+% 3.1 The PBoC's policy framework: multi-instrument, gradual transition from
+%     quantity to price targeting; FR007 as the de facto market anchor since
+%     ~2016; LPR reform of August 2019; abandonment of the 1-year MLF in 2024.
+% 3.2 The Government Work Report target system: NPC announcement timing
+%     (March), CPI and growth targets, comparison with Western inflation-targeting
+%     frameworks (no formal IT mandate, but explicit numerical targets that
+%     create de facto accountability).
+% 3.3 The 2023-2025 deflationary episode: timeline, key events, contrast with
+%     prior PBoC behavior (e.g., 2008-09, 2015-16, 2020).
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Empirical Framework}\label{sec:framework}
+% ═══════════════════════════════════════════════════════════════════════════
+
+% This is where most of the methodology content from the existing proposal
+% and from the slides goes. Subsections:
+
+\subsection{Sufficient statistics for counterfactual policy evaluation}
+
+% [Adapted from CMW2025 introduction. Statement of Proposition 1 (Wold
+% representation + invertibility), and the four-block decomposition.]
+
+\subsection{Baseline projection: Bayesian VAR}
+
+% [Slides Block 3 content. 7-variable monthly BVAR with p=6 lags,
+% Minnesota prior, COVID dummies. Variable list and ordering.
+% Estimation sample decisions.]
+
+\subsection{Narrative shocks: a forward-looking policy rule for FR007}
+
+% [Slides Block 1 content + content from existing proposal §3.6.
+% Specification of the rule; motivation for hybrid CXZ2025 + MANR2026
+% specification; asymmetric output gap; FX gap construction.]
+
+\subsection{High-frequency shocks: FR007 surprises on PBoC event dates}
+
+% [Slides Block 2 content. Event date construction from CMPI.xlsx;
+% the 5 core policy instruments tracked; rate-change-only restriction
+% and rationale; daily-to-monthly aggregation by summation.]
+
+\subsection{The counterfactual solver}
+
+% [Slides Block 4 content. Loss function; stacked-OLS solution;
+% the two-treatment Toeplitz construction (Pi_m as T x 2);
+% Wolf-style first-period wedge for the discontinuous FR007 jump.]
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Data}\label{sec:data}
+% ═══════════════════════════════════════════════════════════════════════════
+
+% [TO WRITE: ~1 page]
+% Monthly GDP construction following Stock & Watson (2010) using consumption,
+% FAI, government spending, trade balance.
+% Inflation, IP, M2, FR007, NEER, US IP --- sources, frequency, sample.
+% Event date construction from CMPI.xlsx.
+% Government Work Report targets (3/3/3/3/2 for 2021--2025) --- step in
+% March (NPC announcement), not January.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Estimated Causal Effects}\label{sec:irf}
+% ═══════════════════════════════════════════════════════════════════════════
+
+% [TO WRITE: ~2-3 pages with figures]
+% 6.1 The estimated policy rule (Figure: actual vs predicted FR007, residuals).
+% 6.2 Narrative IRFs (Figure with credible bands).
+% 6.3 HFI IRFs and comparison "any announcement" vs. "rate-change-only".
+% 6.4 The price puzzle: discussion through Chodorow-Reich housing channel.
+% 6.5 Subsample IRF comparison (2002-2015, 2015-2020, 2020-2025) as
+%     evidence of regime change in transmission.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Counterfactual Analysis}\label{sec:counterfactual}
+% ═══════════════════════════════════════════════════════════════════════════
+
+% [TO WRITE: ~3-4 pages, this is the core results section]
+% 7.1 Strict CPI targeting (lambda_pi = lambda_i = 1).
+% 7.2 Flexible IT with output (adds lambda_y).
+% 7.3 NEER-augmented (adds lambda_e).
+% 7.4 Robustness: 2022 vs. 2025 estimation cutoff; 2023:01 vs 2022:12 start.
+% 7.5 Discussion: counterfactual vs. GWR target as the main metric;
+%     pessimistic baseline as a caveat.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Discussion and Limitations}\label{sec:discussion}
+% ═══════════════════════════════════════════════════════════════════════════
+
+% [TO WRITE: ~1.5 pages]
+% Linearity in monthly shock aggregation (saved research idea 2).
+% Single-instrument restriction (multi-instrument PBoC vs. FR007 anchor).
+% Information effects in coordinated regimes (idea 4 --- Plantin signal).
+% Mid-month clustering / HFI contamination (idea 1).
+% Pessimistic baseline as structural-break concern.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section{Conclusion}\label{sec:conclusion}
+% ═══════════════════════════════════════════════════════════════════════════
+
+% [TO WRITE: ~1/2 page]
 % References Section
 % Note: You can replace this with a BibTeX file if you have one.
 \newpage
@@ -163,6 +280,36 @@ Fernald J., Eric Hsu, Mark M. Spiegel (2021).
 Romer, Christina D., and David H. Romer. (2004).
 \newblock A New Measure of Monetary Shocks: Derivation and Implications.
 \newblock \textit{American Economic Review}, 94(4), 1055-1084. 
+
+\bibitem[Barnichon and Mesters(2023)]{barnichon2023}
+Barnichon, R., and G. Mesters. (2023).
+\newblock A Sufficient Statistics Approach for Macro Policy Evaluation.
+\newblock \textit{Working Paper}.
+
+\bibitem[Bouscasse and Hu(2024)]{bouscasse2024}
+Bouscasse, P., and S. Hu. (2024).
+\newblock Fiscal Policy and Monetary Counterfactuals: Evidence from the U.S.\ Post-COVID Inflation.
+\newblock \textit{Working Paper}.
+
+\bibitem[Chodorow-Reich(2025)]{chodorow2025}
+Chodorow-Reich, G. (2025).
+\newblock Housing in the CPI.
+\newblock \textit{Harvard University Working Paper}.
+
+\bibitem[Miranda-Agrippino, Nenova and Rey(2026)]{rey2026}
+Miranda-Agrippino, S., T. Nenova, and H. R\'ey. (2026).
+\newblock A Composite Monetary Policy Indicator for China.
+\newblock \textit{Working Paper}.
+
+\bibitem[Giannone, Lenza and Primiceri(2015)]{giannone2015}
+Giannone, D., M. Lenza, and G. E. Primiceri. (2015).
+\newblock Prior Selection for Vector Autoregressions.
+\newblock \textit{Review of Economics and Statistics}, 97(2), 436--451.
+
+\bibitem[Stock and Watson(2010)]{stock2010}
+Stock, J. H., and M. W. Watson. (2010).
+\newblock Distribution of Quarterly Values of GDP/GDI Across Months Within the Quarter.
+\newblock \textit{Mimeo}.
 
 \end{thebibliography}
 
