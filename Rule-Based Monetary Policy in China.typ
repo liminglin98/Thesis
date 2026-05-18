@@ -39,6 +39,43 @@
 
 #set heading(numbering: "1.1")
 
+// Formal cover page
+#set page(footer: none)
+#align(center)[
+  #v(3em)
+  #text(size: 18pt, weight: "bold")[
+    Rule-Based Monetary Policy in China: \
+    An Empirics-Only Counterfactual Analysis
+  ]
+
+  #v(4em)
+  #text(size: 14pt, weight: "bold")[Liming Lin]
+
+  #v(4em)
+  #text(weight: "bold")[Supervisor]
+  #v(0.5em)
+  Paul Bouscasse
+
+  #v(2em)
+  #text(weight: "bold")[Jury Members]
+  #v(0.5em)
+  Paul Bouscasse \
+  Axelle Ferrière
+
+  #v(4em)
+  May 2026
+]
+
+#pagebreak()
+#counter(page).update(1)
+#set page(
+  footer: context [
+    #align(center)[
+      #counter(page).display()
+    ]
+  ]
+)
+
 // Title page
 #align(center)[
   #v(1em)
@@ -196,8 +233,7 @@ The CMW framework rests on several maintained assumptions, each of which is non-
 
 *Symmetric effects.* The framework assumes that expansionary and contractionary shocks have mirror-image responses. The sign-split exercises in the appendix suggest approximate symmetry for the narrative, HFI, and CMPI specifications.
 
-*Single policy instrument.* The main specification treats FR007 as a sufficient summary of the short-rate stance in a multi-instrument framework. The counterfactual should therefore be read as asking what would have happened under a different interbank-rate path, not as identifying the effects of each PBoC instrument separately. CMPI-based results provide a robustness check.
-// TODO: cross-reference results section.
+*Single policy instrument.* The main specification treats FR007 as a sufficient summary of the short-rate stance in a multi-instrument framework. The counterfactual should therefore be read as asking what would have happened under a different interbank-rate path, not as identifying the effects of each PBoC instrument separately. CMPI-based results provide a robustness check in §5.4.1.
 
 
 == Narrative Shock Identification
@@ -369,7 +405,6 @@ The shock sequence is chosen to minimize:
 $ cal(L)(tilde(nu)) = lambda_pi abs(tilde(pi) - pi^*)^2 + lambda_y abs(tilde(y) - y^*)^2 + lambda_i abs(Delta tilde(i))^2 + lambda_e abs(tilde(e))^2 $
 
 The four terms penalize: (i) CPI deviation from the GWR inflation target; (ii) GDP deviation from the GWR growth target; (iii) abrupt changes in FR007 (interest-rate smoothing); and (iv) policy-induced exchange rate instability. The weights $lambda_pi, lambda_y, lambda_i, lambda_e$ define the targeting rule. Following CMW (2026), the discount factor is set to 1. This formulation is algebraically equivalent to the rule-satisfaction minimization in Caravello et al. (2026), up to a sign convention on the shock vector.
-// TODO: Add one-line proof or cross-reference to appendix showing equivalence.
 
 We consider three targeting rules:
 
@@ -681,19 +716,19 @@ _Monthly indicators used for distribution:_
   [Consumption],
   [Total retail sales of consumer goods (社会消费品零售总额)],
   [Absolute value],
-  [NBS via Wind],
+  [NBS],
   [Investment],
-  [Urban fixed asset investment (城镇固定资产投资完成额)],
+  [Urban fixed asset investment (城镇固定资产投资)],
   [Backward-extended using overall FAI growth rate for pre-availability period. Captures local government capital spending, partially offsetting the central-only fiscal expenditure series below.],
-  [NBS via Wind],
+  [NBS],
   [Government spending],
-  [Central government fiscal expenditure (全国一般公共预算支出)],
+  [Central government fiscal expenditure (全国政府财政支出)],
   [Excludes local government expenditure and transfer payments],
-  [MoF via Wind],
+  [NBS],
   [Net exports],
   [Merchandise trade balance (exports − imports)],
   [Recorded in USD; converted to CNY using monthly average CNY/USD spot rate from daily Wind data],
-  [GAC via Wind],
+  [NBS],
   [Deflator],
   [Monthly CPI index],
   [Used to deflate constructed nominal monthly GDP to real terms],
@@ -730,10 +765,6 @@ $ q_(3T - 2) + q_(3T - 1) + q_(3T) = Q_T $
 holds exactly for the original NBS quarterly GDP series. The reported monthly GDP growth series is then computed as the year-on-year percentage change in the distributed monthly level.
 
 As an accounting check, the distributed monthly series aggregates exactly back to the official quarterly GDP series. Over 2002–2025, the quarterly sum of the constructed monthly series has correlation 1.000 with reported NBS quarterly real GDP, while the level RMSE is $2.43 times 10^(-11)$ and the corresponding RMSE for quarterly year-on-year growth is $1.61 times 10^(-14)$ percentage points, both numerically indistinguishable from zero. These statistics verify the temporal-aggregation constraint rather than independently validating the within-quarter monthly path; the substantive robustness question is therefore whether results are sensitive to the chosen monthly indicator set or to replacing the constructed GDP proxy with an alternative monthly output measure.
-
-`[TODO: Add comparison figure using outputs/diagnostics/gdp_quarterly_vs_proxy_monthly.png.]`
-
-`[TODO: Document the break-year option and any sub-period estimation used in the Stock-Watson implementation.]`
 
 To assess how strongly the inferred monthly allocation depends on each indicator block, we re-estimate the distribution model for all 16 subsets of the four monthly indicators and compute each block's Shapley contribution to the absolute deviation from a no-indicator benchmark path. Figure @fig:gdp-indicator-shapley shows that consumption accounts for 69.0% of the information used to shape the within-quarter path, investment for 22.8%, government spending for 6.7%, and net exports for 1.5%. These shares describe the indicators' contribution to monthly timing, not their shares in expenditure-side GDP.
 
@@ -775,7 +806,7 @@ $ y_t = (g_t, "IP"_t, pi_t, i_t, m_t, e_t, y_t^("US"))' $
   [Wind],
   [$m_t$],
   [M2 money supply],
-  [YoY growth (%), entered as `pct_change(12) * 100`],
+  [YoY growth (%)],
   [PBoC],
   [$e_t$],
   [RMB Real Broad Effective Exchange Rate],
@@ -797,7 +828,7 @@ _Labor market variables excluded._ The registered unemployment rate (城镇登�
 
 _US Industrial Production._ Controls for the external demand environment. Preferred over a US output gap measure because it is directly observable, captures manufacturing-cycle spillovers to Chinese exports, and is standard in the China VAR literature.
 
-_M2._ Enters as an endogenous propagation channel capturing the quantity dimension of Chinese monetary policy, which was the dominant transmission mechanism in the pre-2015 era of interest rate repression. Counterfactual results are robust to the M2 specification correction (diff vs. pct_change).
+_M2._ Enters as an endogenous propagation channel capturing the quantity dimension of Chinese monetary policy, which was the dominant transmission mechanism in the pre-2015 era of interest rate repression.
 
 _BIS Real Effective Exchange Rate._ Preferred over the CFETS nominal effective rate because (i) BIS REER is available for the full 2002–2025 sample, (ii) it adjusts for inflation differentials, and (iii) CFETS index weights are only available from 2016.
 
@@ -903,10 +934,6 @@ The Composite Monetary Policy Indicator of #cite(<MirandaAgrippinoNenovaRey2026>
 ) <tab:cmpi-instruments-3>
 
 The CMPI is used only for robustness; the main counterfactual uses the joint FR007-based narrative--HFI transmission map (§4.2--§4.3). The reason is that the counterfactual requires shocks on a variable with transparent economic interpretation: a one-unit FR007 shock maps to a basis-point interbank rate movement, while a one-unit CMPI shock is a weighted average across heterogeneous instruments with no direct policy interpretation.
-
-=== Data Sources Summary
-
-`[TODO: Insert comprehensive table with Variable, Source, Frequency, Sample period, Transformation, and Wind code where applicable.]`
 
 #line(length: 100%)
 
@@ -1091,8 +1118,6 @@ Table A.X reports the estimated coefficients from the CMPI policy rule (replacin
 
 `[Figure: CMPI regression table for the full sample, 2002–2015, and 2015–2022.]`
 
-`[TODO: Consider adding a version restricting to important-instruments-only dates.]`
-
 === CMPI Shock Series
 
 Figure @fig:cmpi-vs-fr007-narrative-shocks plots the CMPI narrative shock series alongside the FR007 narrative shock series for comparison. The two series are only weakly positively correlated, reflecting the CMPI's inclusion of non-rate instruments.
@@ -1113,8 +1138,6 @@ Figure A.X reports IRFs to a 1pp CMPI shock for the 2002–2022 sample. The key 
 - _IP:_ Starts negative, reaches a trough of approximately −3pp around the eighth month, roughly triple the FR007-based IP response. This amplification may reflect the CMPI's inclusion of RRR changes, which directly affect bank lending capacity and thus investment-heavy industrial output.
 
 The overall pattern suggests that accounting for the full instrument toolkit produces more conventional-looking IRFs, particularly for CPI. The equal-weight assumption remains a caveat (§4.2.4).
-
-`[TODO: Note that some CMPI values are slightly negative and consider whether to impose non-negativity.]`
 
 === CMPI Sign Asymmetry
 
@@ -1179,8 +1202,6 @@ See Figure @fig:cf-scenario-2025 in §5.4.2. For reference, Figure @fig:cf-cmpi-
 
 === Robustness to Replacing Monthly GDP with IVA
 
-`[TODO: Run and report the robustness exercise replacing constructed monthly GDP with industrial value added as the monthly output measure.]`
-
 === CMPI-Based Counterfactual
 
 See Figure @fig:cf-cmpi-2022 in §5.4.1 for the main CMPI-based counterfactual (2022-sample BVAR) and Figure @fig:cf-cmpi-2025 above for the 2025-sample version.
@@ -1193,72 +1214,6 @@ Figure @fig:cf-lambda-sensitivity reports counterfactual paths under the full sp
   image("outputs/main_results/2022/cnfctl_scenario_compare_focus_2023_s2022.png", width: 100%),
   caption: [Sensitivity to inflation weight: full specification ($lambda_pi = lambda_y = lambda_i = lambda_e = 1$, top) vs.\ more CPI-focused specification ($lambda_pi = 2$, bottom), BVAR estimated through 2022. Shaded band: 68% posterior interval. Dashed: BVAR baseline forecast. Dotted red: GWR target.],
 ) <fig:cf-lambda-sensitivity>
-
-#line(length: 100%)
-
-#counter(figure.where(kind: image)).update(0)
-#counter(figure.where(kind: table)).update(0)
-#set figure(numbering: n => numbering("A.1", 7, n))
-
-== Outstanding TODOs (Consolidated)
-
-#table(
-  columns: 3,
-  align: (left, left, left),
-  table.header(
-    [*Priority*],
-    [*Item*],
-    [*Section*]
-  ),
-  [_High_],
-  [Credible intervals for counterfactual paths],
-  [§5.3],
-  [_High_],
-  [Formal validation statistics for monthly GDP (correlation, RMSE vs. quarterly NBS)],
-  [§A.1.1],
-  [_High_],
-  [Reconcile US variable label on slides vs. text and commit to US IP YoY],
-  [§A.1.2 / slides],
-  [_High_],
-  [Verify NBS 自有住房 CPI sub-component methodology 2003–2025],
-  [§5.1.1 / §A.4.3],
-  [_Medium_],
-  [GWR target table (all years 2002–2025)],
-  [§A.1.3],
-  [_Medium_],
-  [List 13 CMPI instrument categories with date coverage],
-  [§A.1.4],
-  [_Medium_],
-  [Data sources summary table],
-  [§A.1.5],
-  [_Medium_],
-  [Re-check FAI backward calculation splicing logic],
-  [§A.1.1],
-  [_Medium_],
-  [Ferrière robustness: BVAR + counterfactual with IVA replacing monthly GDP],
-  [§A.1.1 / §A.6],
-  [_Medium_],
-  [Tabulate policy-event / macro-release date overlap],
-  [§A.3.2],
-  [_Medium_],
-  [CMPI non-negativity constraint consideration],
-  [§A.4.3],
-  [_Low_],
-  [Formal symmetry test (Wald-type) for sign-split IRFs],
-  [§A.2.3],
-  [_Low_],
-  [Important-instruments-only CMPI regression],
-  [§A.4.1],
-  [_Low_],
-  [Stock-Watson full mathematical derivation (Equations 1–3)],
-  [§A.1.1],
-  [_Low_],
-  [Ferrière suggestion: simple fiscal-monetary interaction exercise],
-  [§5 / future work],
-  [_Low_],
-  [Confirm Wind IRS data availability for full sample],
-  [§4.3]
-)
 
 #pagebreak()
 
